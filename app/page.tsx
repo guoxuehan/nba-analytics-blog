@@ -1,0 +1,84 @@
+import { Suspense } from 'react'
+import { getPublishedPosts } from '@/lib/posts'
+import { HeroArticle } from '@/app/components/HeroArticle'
+import { ArticleGrid } from '@/app/components/ArticleGrid'
+import { CategorySection } from '@/app/components/CategorySection'
+
+// ─── スケルトン（Suspense フォールバック） ────────────────────
+
+function HeroSkeleton() {
+  return (
+    <div
+      className="w-full bg-bg-secondary animate-pulse"
+      style={{ height: 'clamp(480px, 62vh, 660px)' }}
+    />
+  )
+}
+
+function GridSkeleton() {
+  return (
+    <div className="container-content section-gap">
+      <div className="h-6 w-24 bg-bg-secondary rounded animate-pulse mb-6" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[1, 2].map((i) => (
+          <div key={i} className="card overflow-hidden">
+            <div className="bg-bg-secondary animate-pulse" style={{ paddingBottom: '56.25%' }} />
+            <div className="p-5 space-y-3">
+              <div className="h-3 w-16 bg-bg-secondary rounded animate-pulse" />
+              <div className="h-5 bg-bg-secondary rounded animate-pulse" />
+              <div className="h-4 bg-bg-secondary rounded animate-pulse w-4/5" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── データフェッチ＋レンダリング（Server Component） ─────────
+
+async function HomeContent() {
+  const posts = await getPublishedPosts(20)
+
+  const hero = posts[0]
+  const gridPosts = posts.slice(1, 9)
+
+  const playerPosts = posts.filter((p) => p.category === '選手分析')
+  const tacticsPosts = posts.filter((p) => p.category === '戦術' || p.category === 'データ')
+
+  return (
+    <>
+      {hero && <HeroArticle post={hero} />}
+
+      <ArticleGrid posts={gridPosts} title="LATEST" />
+
+      <CategorySection
+        title="選手分析"
+        href="/players"
+        posts={playerPosts.slice(0, 4)}
+        layout="grid"
+      />
+
+      <CategorySection
+        title="戦術・データ"
+        href="/tactics"
+        posts={tacticsPosts.slice(0, 4)}
+        layout="scroll"
+      />
+    </>
+  )
+}
+
+// ─── ページエントリ ──────────────────────────────────────────
+
+export default function HomePage() {
+  return (
+    <>
+      <Suspense fallback={<HeroSkeleton />}>
+        <Suspense fallback={<GridSkeleton />}>
+          <HomeContent />
+        </Suspense>
+      </Suspense>
+    </>
+  )
+}

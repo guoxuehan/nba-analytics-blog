@@ -1,0 +1,396 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   Dark mode: next-themes が <html> に .dark を付与
+   ───────────────────────────────────────────── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ─────────────────────────────────────────────
+   CSS Variables — Light Mode
+   ───────────────────────────────────────────── */
+:root {
+  --bg:               #FFFFFF;
+  --bg-secondary:     #F4F4F4;
+  --text-primary:     #1A1A1A;
+  --text-secondary:   #666666;
+  --accent:           #D32F2F;
+  --accent-blue:      #1565C0;
+  --border:           #E0E0E0;
+  --badge-bg:         #1A1A1A;
+  --badge-text:       #FFFFFF;
+}
+
+/* ─────────────────────────────────────────────
+   CSS Variables — Dark Mode
+   ───────────────────────────────────────────── */
+.dark {
+  --bg:               #0D0D0D;
+  --bg-secondary:     #1A1A1A;
+  --text-primary:     #F0F0F0;
+  --text-secondary:   #999999;
+  --accent:           #EF5350;
+  --accent-blue:      #42A5F5;
+  --border:           #2A2A2A;
+  --badge-bg:         #F0F0F0;
+  --badge-text:       #0D0D0D;
+}
+
+/* ─────────────────────────────────────────────
+   Tailwind v4 Theme — CSS vars をユーティリティに接続
+   @theme inline = 値をインライン展開せず var() 参照を維持
+   ───────────────────────────────────────────── */
+@theme inline {
+  /* Colors */
+  --color-bg:             var(--bg);
+  --color-bg-secondary:   var(--bg-secondary);
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-accent:         var(--accent);
+  --color-accent-blue:    var(--accent-blue);
+  --color-border:         var(--border);
+  --color-badge-bg:       var(--badge-bg);
+  --color-badge-text:     var(--badge-text);
+
+  /* Fonts — next/font/google が --font-oswald / --font-source-sans を注入 */
+  --font-heading: var(--font-oswald), 'Noto Sans JP', sans-serif;
+  --font-body:    var(--font-source-sans), 'Noto Sans JP', sans-serif;
+}
+
+/* ─────────────────────────────────────────────
+   カスタムユーティリティ
+   ───────────────────────────────────────────── */
+
+/* コンテンツ最大幅 1200px */
+@utility container-content {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+/* 記事本文 最大幅 720px */
+@utility container-article {
+  max-width: 720px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+/* セクション区切り余白（64px〜80px） */
+@utility section-gap {
+  padding-block: 4rem;
+}
+@utility section-gap-lg {
+  padding-block: 5rem;
+}
+
+/* カテゴリバッジ */
+@utility badge {
+  display: inline-block;
+  background-color: var(--badge-bg);
+  color: var(--badge-text);
+  font-family: var(--font-heading);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2em 0.6em;
+  border-radius: 2px;
+}
+
+/* 見出しスタイル共通 */
+@utility heading {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* 情報密度の高いカード（角丸は最小限） */
+@utility card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   Base styles
+   ───────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* アクセントカラーのボーダーライン（ESPN風） */
+.accent-bar {
+  border-top: 3px solid var(--accent);
+}
+
+/* セクションラベル（ESPN / The Ringer 風の横ライン区切り） */
+.section-label {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* ─────────────────────────────────────────────
+   記事本文タイポグラフィ（.article-prose）
+   ───────────────────────────────────────────── */
+
+.article-prose {
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.8;
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .article-prose {
+    font-size: 16px;
+  }
+}
+
+.article-prose p {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.article-prose h2 {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding-left: 1rem;
+  border-left: 4px solid var(--accent);
+  color: var(--text-primary);
+}
+
+.article-prose h3 {
+  font-family: var(--font-body);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.article-prose h4 {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.article-prose blockquote {
+  border-left: 3px solid var(--border);
+  margin: 1.75rem 0;
+  padding: 0.875rem 1.25rem;
+  background-color: var(--bg-secondary);
+  font-style: italic;
+  color: var(--text-secondary);
+  border-radius: 0 4px 4px 0;
+}
+
+.article-prose blockquote p {
+  margin-bottom: 0.5rem;
+}
+
+.article-prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* インラインコード */
+.article-prose :not(pre) > code {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 0.15em 0.45em;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'Geist Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--accent);
+}
+
+/* コードブロック */
+.article-prose pre {
+  background-color: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  margin: 1.75rem 0;
+  scrollbar-width: thin;
+}
+
+.article-prose pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #d4d4d4;
+  font-family: 'Geist Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* 非順序リスト */
+.article-prose ul {
+  list-style: none;
+  padding-left: 1.5rem;
+  margin: 1.25rem 0;
+}
+
+.article-prose ul > li {
+  position: relative;
+  padding-left: 0.25rem;
+  margin-bottom: 0.6rem;
+}
+
+.article-prose ul > li::before {
+  content: '';
+  position: absolute;
+  left: -1rem;
+  top: 0.68em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* 順序リスト */
+.article-prose ol {
+  list-style: none;
+  padding-left: 1.75rem;
+  margin: 1.25rem 0;
+  counter-reset: article-counter;
+}
+
+.article-prose ol > li {
+  position: relative;
+  padding-left: 0.25rem;
+  margin-bottom: 0.6rem;
+  counter-increment: article-counter;
+}
+
+.article-prose ol > li::before {
+  content: counter(article-counter) ".";
+  position: absolute;
+  left: -1.75rem;
+  color: var(--accent);
+  font-weight: 700;
+  font-family: var(--font-heading);
+  font-size: 0.875em;
+}
+
+/* テーブル */
+.article-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.75rem 0;
+  font-size: 14px;
+  display: block;
+  overflow-x: auto;
+}
+
+.article-prose th {
+  background-color: var(--bg-secondary);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.article-prose td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: top;
+}
+
+.article-prose tr:last-child td {
+  border-bottom: none;
+}
+
+/* リンク */
+.article-prose a {
+  color: var(--accent-blue);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent-blue) 35%, transparent);
+  text-underline-offset: 3px;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.article-prose a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+/* 強調 */
+.article-prose strong {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.article-prose em {
+  font-style: italic;
+}
+
+/* 画像 */
+.article-prose img {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  display: block;
+  margin: 1.75rem 0 0.5rem;
+}
+
+.article-prose figure {
+  margin: 1.75rem 0;
+}
+
+.article-prose figcaption {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* 水平線 */
+.article-prose hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5rem 0;
+}
