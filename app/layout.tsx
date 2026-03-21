@@ -32,8 +32,8 @@ const notoSansJP = Noto_Sans_JP({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | COURT VISION',
-    default: 'COURT VISION — NBAアナリティクス',
+    template: '%s | NBA COURT VISION',
+    default: 'NBA COURT VISION — NBAアナリティクス',
   },
   description: 'NBAの高度なアナリティクス、選手分析、戦術解説',
 }

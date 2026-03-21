@@ -23,7 +23,7 @@ export default function LoginPage() {
         maxWidth: '360px',
       }}>
         <h1 style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '0.1em', marginBottom: '1.5rem', color: '#111' }}>
-          COURT VISION ADMIN
+          NBA COURT VISION ADMIN
         </h1>
 
         <form action={action}>

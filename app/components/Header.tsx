@@ -142,7 +142,7 @@ export function Header() {
           className="font-heading text-xl font-bold uppercase text-text-primary hover:text-accent transition-colors duration-150 shrink-0"
           style={{ letterSpacing: '0.1em' }}
         >
-          COURT VISION
+          NBA COURT VISION
         </Link>
 
         {/* デスクトップナビゲーション */}

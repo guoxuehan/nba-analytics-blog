@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           borderBottom: '3px solid #D32F2F',
         }}>
           <Link href="/admin/articles" style={{ color: '#fff', fontWeight: 700, fontSize: '13px', letterSpacing: '0.1em', textDecoration: 'none' }}>
-            COURT VISION ADMIN
+            NBA COURT VISION ADMIN
           </Link>
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             <Link href="/admin/articles" style={{ color: '#ccc', fontSize: '13px', textDecoration: 'none' }}>

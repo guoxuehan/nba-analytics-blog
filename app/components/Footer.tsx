@@ -43,7 +43,7 @@ export function Footer() {
               className="font-heading font-bold text-lg uppercase text-text-primary"
               style={{ letterSpacing: '0.1em' }}
             >
-              COURT VISION
+              NBA COURT VISION
             </p>
             <p className="text-text-secondary text-sm mt-1">
               NBAアナリティクス

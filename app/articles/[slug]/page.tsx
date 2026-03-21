@@ -48,7 +48,7 @@ export async function generateMetadata({
       type: 'article',
       publishedTime: post.published_at,
       url: `${siteUrl}/articles/${post.slug}`,
-      siteName: 'COURT VISION',
+      siteName: 'NBA COURT VISION',
       ...(post.thumbnail_url ? { images: [{ url: post.thumbnail_url }] } : {}),
     },
     twitter: {
@@ -92,12 +92,12 @@ export default async function ArticlePage({
     url: `${siteUrl}/articles/${post.slug}`,
     publisher: {
       '@type': 'Organization',
-      name: 'COURT VISION',
+      name: 'NBA COURT VISION',
       url: siteUrl,
     },
     author: {
       '@type': 'Organization',
-      name: 'COURT VISION',
+      name: 'NBA COURT VISION',
     },
     ...(post.thumbnail_url
       ? { image: { '@type': 'ImageObject', url: post.thumbnail_url } }
