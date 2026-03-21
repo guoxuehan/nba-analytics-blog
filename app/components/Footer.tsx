@@ -2,10 +2,10 @@ import Link from 'next/link'
 
 const NAV_ITEMS = [
   { label: '最新記事', href: '/' },
-  { label: '選手分析', href: '/players' },
-  { label: 'チーム分析', href: '/teams' },
-  { label: '戦術', href: '/tactics' },
-  { label: 'データ', href: '/data' },
+  { label: '選手分析', href: '/category/player_analysis' },
+  { label: 'チーム分析', href: '/category/team_analysis' },
+  { label: '戦術', href: '/category/tactics' },
+  { label: 'データ', href: '/category/data' },
 ]
 
 const SOCIAL_LINKS = [
