@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { type Post, getCategoryGradient, formatDate } from '@/lib/posts'
+import { type Post, getCategoryGradient, getCategoryLabel, formatDate } from '@/lib/posts'
 
 type Props = { post: Post }
 
@@ -33,7 +33,7 @@ export function ArticleCardSmall({ post }: Props) {
         {/* テキスト */}
         <div className="flex flex-col min-w-0 py-0.5 gap-1">
           <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent font-heading">
-            {post.category}
+            {getCategoryLabel(post.category)}
           </span>
 
           <h3

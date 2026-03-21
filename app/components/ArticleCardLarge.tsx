@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { type Post, getCategoryGradient, formatDate } from '@/lib/posts'
+import { type Post, getCategoryGradient, getCategoryLabel, formatDate } from '@/lib/posts'
 
 type Props = { post: Post }
 
@@ -39,7 +39,7 @@ export function ArticleCardLarge({ post }: Props) {
               fontFamily: 'var(--font-heading)',
             }}
           >
-            {post.category}
+            {getCategoryLabel(post.category)}
           </span>
 
           {/* タイトル */}

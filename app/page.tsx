@@ -50,6 +50,19 @@ async function HomeContent() {
 
   return (
     <>
+      {/* タグラインバー */}
+      <div
+        className="w-full border-b border-border"
+        style={{ background: 'var(--bg-secondary)', padding: '12px 0' }}
+      >
+        <p
+          className="text-center font-body text-text-secondary"
+          style={{ fontSize: '15px', letterSpacing: '0.05em' }}
+        >
+          戦略コンサル × PhDデータサイエンティストが、NBAをデータから解剖する。
+        </p>
+      </div>
+
       {hero && <HeroArticle post={hero} />}
 
       <ArticleGrid posts={gridPosts} title="LATEST" />

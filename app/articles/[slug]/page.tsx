@@ -11,6 +11,7 @@ import {
   getPublishedPosts,
   calculateReadingTime,
   getCategoryGradient,
+  getCategoryLabel,
   formatDate,
 } from '@/lib/posts'
 import { ArticleContent } from '@/app/components/ArticleContent'
@@ -119,7 +120,7 @@ export default async function ArticlePage({
             <div style={{ maxWidth: '760px' }}>
               {/* カテゴリバッジ */}
               <Link
-                href={`/${encodeURIComponent(post.category)}`}
+                href={`/category/${post.category}`}
                 className="inline-block text-[11px] font-bold uppercase tracking-[0.1em] px-2 py-[3px] mb-4 hover:opacity-80 transition-opacity"
                 style={{
                   background: 'var(--accent)',
@@ -128,7 +129,7 @@ export default async function ArticlePage({
                   fontFamily: 'var(--font-heading)',
                 }}
               >
-                {post.category}
+                {getCategoryLabel(post.category)}
               </Link>
 
               {/* タイトル */}

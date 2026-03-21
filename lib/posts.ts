@@ -244,6 +244,17 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
   'データ':     'linear-gradient(155deg, #090912 0%, #10101e 60%, #191930 100%)',
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  player_analysis: '選手分析',
+  team_analysis:   'チーム分析',
+  tactics:         '戦術',
+  data:            'データ',
+}
+
+export function getCategoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] ?? category
+}
+
 export function getCategoryGradient(category: string): string {
   return CATEGORY_GRADIENTS[category] ?? 'linear-gradient(155deg, #0d0d0d 0%, #1a1a1a 100%)'
 }
