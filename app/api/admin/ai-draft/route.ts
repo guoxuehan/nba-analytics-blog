@@ -1,9 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyAdminRequest } from '@/lib/admin-auth'
 
-const client = new Anthropic()
-
 export async function POST(request: Request) {
+  const client = new Anthropic()
   // 認証チェック
   const isAdmin = await verifyAdminRequest(request)
   if (!isAdmin) {

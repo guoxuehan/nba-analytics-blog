@@ -1,3 +1,5 @@
+export const revalidate = 60
+
 import { Suspense } from 'react'
 import { getPublishedPosts } from '@/lib/posts'
 import { HeroArticle } from '@/app/components/HeroArticle'

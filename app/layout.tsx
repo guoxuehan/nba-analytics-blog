@@ -3,6 +3,7 @@ import { Oswald, Source_Sans_3, Noto_Sans_JP } from 'next/font/google'
 import { Providers } from './providers'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
+import { PageTransition } from './components/PageTransition'
 import './globals.css'
 
 // 見出し: ESPN風コンデンスド書体
@@ -52,7 +53,7 @@ export default function RootLayout({
         <Providers>
           <Header />
           <main className="flex-1">
-            {children}
+            <PageTransition>{children}</PageTransition>
           </main>
           <Footer />
         </Providers>

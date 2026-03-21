@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdminAuth } from '@/lib/admin-auth'
 
 // ─── 型 ───────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ export async function getAdminArticles(
 ): Promise<AdminArticle[]> {
   await requireAdminAuth()
 
-  let query = supabaseAdmin
+  let query = getSupabaseAdmin()
     .from('articles')
     .select('id, title, slug, category, published, published_at, created_at')
     .order('created_at', { ascending: false })
@@ -56,7 +56,7 @@ export async function getAdminArticles(
 export async function getAdminArticle(id: string): Promise<ArticleFormData | null> {
   await requireAdminAuth()
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from('articles')
     .select('*')
     .eq('id', id)
@@ -102,7 +102,7 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
   }
 
   if (data.id) {
-    const { error } = await supabaseAdmin.from('articles').update(payload).eq('id', data.id)
+    const { error } = await getSupabaseAdmin().from('articles').update(payload).eq('id', data.id)
     if (error) return { error: error.message }
 
     revalidatePath('/admin/articles')
@@ -111,7 +111,7 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
     return { success: true, id: data.id }
   }
 
-  const { data: created, error } = await supabaseAdmin
+  const { data: created, error } = await getSupabaseAdmin()
     .from('articles')
     .insert({ ...payload, created_at: now })
     .select('id')
@@ -132,7 +132,7 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
 export async function deleteArticleAction(id: string): Promise<{ error?: string }> {
   await requireAdminAuth()
 
-  const { error } = await supabaseAdmin.from('articles').delete().eq('id', id)
+  const { error } = await getSupabaseAdmin().from('articles').delete().eq('id', id)
   if (error) return { error: error.message }
 
   revalidatePath('/admin/articles')

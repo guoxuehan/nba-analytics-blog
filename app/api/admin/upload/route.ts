@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { verifyAdminRequest } from '@/lib/admin-auth'
 
 const BUCKET = 'post-images'
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   const fileName = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
   const buffer = await file.arrayBuffer()
+  const supabaseAdmin = getSupabaseAdmin()
 
   const { error } = await supabaseAdmin.storage
     .from(BUCKET)

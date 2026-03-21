@@ -1,12 +1,25 @@
+'use client'
+
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { type Post, getCategoryGradient, formatDate } from '@/lib/posts'
 
 type Props = { post: Post }
 
 export function HeroArticle({ post }: Props) {
-  const bgStyle = post.thumbnail_url
-    ? { backgroundImage: `url(${post.thumbnail_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: getCategoryGradient(post.category) }
+  const parallaxRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = parallaxRef.current
+    if (!el) return
+    const handleScroll = () => {
+      // CSS `translate` プロパティは transform と競合しない
+      el.style.translate = `0 ${window.scrollY * 0.10}px`
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   return (
     <section aria-label="注目記事">
@@ -15,12 +28,31 @@ export function HeroArticle({ post }: Props) {
         className="group relative block overflow-hidden"
         style={{ height: 'clamp(480px, 62vh, 660px)' }}
       >
-        {/* 背景（ホバーで scale 1.02） */}
+        {/* 背景（パララックス用：少し広めに取る） */}
         <div
-          className="absolute inset-0 transition-transform duration-[600ms] ease-out group-hover:scale-[1.02]"
-          style={bgStyle}
+          className="absolute"
+          style={{ inset: '-12%', willChange: 'translate' }}
+          ref={parallaxRef}
           aria-hidden="true"
-        />
+        >
+          {post.thumbnail_url ? (
+            <div className="relative w-full h-full transition-transform duration-[600ms] ease-out group-hover:scale-[1.02]">
+              <Image
+                src={post.thumbnail_url}
+                alt={post.title}
+                fill
+                className="object-cover"
+                priority
+                sizes="100vw"
+              />
+            </div>
+          ) : (
+            <div
+              className="w-full h-full transition-transform duration-[600ms] ease-out group-hover:scale-[1.02]"
+              style={{ background: getCategoryGradient(post.category) }}
+            />
+          )}
+        </div>
 
         {/* 暗いグラデーションオーバーレイ */}
         <div

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 // ─── 型定義 ────────────────────────────────────────────────────
 
@@ -262,7 +262,7 @@ export function formatDate(dateString: string): string {
 
 export async function getPublishedPosts(limit = 20): Promise<Post[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('articles')
       .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
       .eq('published', true)
@@ -278,7 +278,7 @@ export async function getPublishedPosts(limit = 20): Promise<Post[]> {
 
 export async function getPostBySlug(slug: string): Promise<PostDetail | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('articles')
       .select('*')
       .eq('slug', slug)
@@ -298,7 +298,7 @@ export async function getRelatedPosts(
   limit = 3,
 ): Promise<Post[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('articles')
       .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
       .eq('published', true)
@@ -322,7 +322,7 @@ export async function getRelatedPosts(
 
 export async function getRecentPosts(excludeSlug: string, limit = 5): Promise<Post[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('articles')
       .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
       .eq('published', true)

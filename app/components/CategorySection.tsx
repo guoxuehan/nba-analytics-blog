@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { type Post } from '@/lib/posts'
 import { ArticleCardLarge } from './ArticleCardLarge'
 import { ArticleCardSmall } from './ArticleCardSmall'
+import { ScrollFadeIn } from './ScrollFadeIn'
 
 type Props = {
   title: string
@@ -35,7 +36,7 @@ export function CategorySection({ title, href, posts, layout = 'grid' }: Props) 
         </div>
         <Link
           href={href}
-          className="text-[11px] font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors duration-150 font-heading"
+          className="text-[11px] font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors duration-200 font-heading"
         >
           すべて見る →
         </Link>
@@ -47,27 +48,27 @@ export function CategorySection({ title, href, posts, layout = 'grid' }: Props) 
           className="flex gap-4 overflow-x-auto pb-2"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          {posts.map((post) => (
-            <div key={post.id} className="shrink-0 w-[260px]">
+          {posts.map((post, i) => (
+            <ScrollFadeIn key={post.id} delay={i * 70} className="shrink-0 w-[260px]">
               <ArticleCardLarge post={post} />
-            </div>
+            </ScrollFadeIn>
           ))}
         </div>
       ) : (
         /* グリッドレイアウト：フィーチャー1枚 + 小カード */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* フィーチャー記事（左 2/3） */}
-          <div className="md:col-span-2">
+          <ScrollFadeIn className="md:col-span-2">
             <ArticleCardLarge post={featured} />
-          </div>
+          </ScrollFadeIn>
 
           {/* サイドの小カード（右 1/3） */}
           {rest.length > 0 && (
-            <div className="flex flex-col divide-y divide-border">
+            <ScrollFadeIn delay={80} className="flex flex-col divide-y divide-border">
               {rest.slice(0, 3).map((post) => (
                 <ArticleCardSmall key={post.id} post={post} />
               ))}
-            </div>
+            </ScrollFadeIn>
           )}
         </div>
       )}

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- ボール本体 -->
+  <circle cx="16" cy="16" r="16" fill="#E8841A"/>
+  <!-- アウトライン -->
+  <circle cx="16" cy="16" r="15.5" stroke="#7B3A10" stroke-width="1"/>
+  <!-- 縦ライン（縫い目） -->
+  <line x1="16" y1="0.5" x2="16" y2="31.5" stroke="#7B3A10" stroke-width="1.5"/>
+  <!-- 上の弧（縫い目） -->
+  <path d="M 0.5 16 Q 16 4 31.5 16" stroke="#7B3A10" stroke-width="1.5" fill="none"/>
+  <!-- 下の弧（縫い目） -->
+  <path d="M 0.5 16 Q 16 28 31.5 16" stroke="#7B3A10" stroke-width="1.5" fill="none"/>
+</svg>

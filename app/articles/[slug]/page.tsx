@@ -1,6 +1,9 @@
+export const revalidate = 60
+
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   getPostBySlug,
   getRelatedPosts,
@@ -76,14 +79,6 @@ export default async function ArticlePage({
   const readingTime = calculateReadingTime(post.content)
   const relatedForBottom = relatedPosts.slice(0, 3)
   const relatedForSidebar = relatedPosts.slice(0, 3)
-
-  const bgStyle = post.thumbnail_url
-    ? {
-        backgroundImage: `url(${post.thumbnail_url})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }
-    : { background: getCategoryGradient(post.category) }
 
   // JSON-LD 構造化データ
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://courtvision.jp'
@@ -180,11 +175,27 @@ export default async function ArticlePage({
         {/* ── ヒーロー画像（任意） ──────────────────────────────── */}
         <div className="container-content pt-6 pb-0">
           <div
-            className="w-full rounded-[4px] overflow-hidden"
-            style={{ height: 'clamp(200px, 40vw, 480px)', ...bgStyle }}
-            role="img"
-            aria-label={post.title}
-          />
+            className="w-full rounded-[4px] overflow-hidden relative"
+            style={{ height: 'clamp(200px, 40vw, 480px)' }}
+          >
+            {post.thumbnail_url ? (
+              <Image
+                src={post.thumbnail_url}
+                alt={post.title}
+                fill
+                className="object-cover"
+                priority
+                sizes="(max-width: 1200px) 100vw, 1200px"
+              />
+            ) : (
+              <div
+                className="absolute inset-0"
+                style={{ background: getCategoryGradient(post.category) }}
+                role="img"
+                aria-label={post.title}
+              />
+            )}
+          </div>
         </div>
 
         {/* ── 本文レイアウト ────────────────────────────────────── */}
