@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 
 function XIcon() {
   return (
@@ -19,16 +19,14 @@ function HatenaIcon() {
 }
 
 type Props = {
-  slug: string
   title: string
 }
 
-export function ShareButtons({ slug, title }: Props) {
-  const [url, setUrl] = useState('')
+function getUrl() { return window.location.href }
+function subscribe() { return () => {} }
 
-  useEffect(() => {
-    setUrl(window.location.href)
-  }, [])
+export function ShareButtons({ title }: Props) {
+  const url = useSyncExternalStore(subscribe, getUrl, () => '')
 
   if (!url) return null
 

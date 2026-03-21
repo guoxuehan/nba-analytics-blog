@@ -236,7 +236,7 @@ export default async function ArticlePage({
 
               {/* ── SNSシェア ──────────────────────────────────── */}
               <div className="mt-6 pt-5 border-t border-border">
-                <ShareButtons slug={post.slug} title={post.title} />
+                <ShareButtons title={post.title} />
               </div>
 
               {/* ── 関連記事（モバイル・タブレット用：lg未満で表示） */}

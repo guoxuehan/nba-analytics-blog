@@ -23,20 +23,6 @@ async function assertLinkNotFound(
   expect(status, `404 detected — location: ${location}, url: ${href}`).not.toBe(404)
 }
 
-/** ページ内のすべての内部リンクhrefを収集 */
-async function collectInternalLinks(page: Page): Promise<string[]> {
-  const hrefs = await page.$$eval('a[href]', (anchors) =>
-    anchors
-      .map((a) => (a as HTMLAnchorElement).getAttribute('href') ?? '')
-      .filter((href) =>
-        href.startsWith('/') &&
-        !href.startsWith('//_') &&
-        !href.startsWith('/admin'),
-      ),
-  )
-  return [...new Set(hrefs)]
-}
-
 // ─── テスト ───────────────────────────────────────────────────
 
 test.describe('ページレスポンス確認', () => {
