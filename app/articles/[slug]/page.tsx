@@ -153,13 +153,6 @@ export default async function ArticlePage({
                 {post.title}
               </h1>
 
-              {/* 抜粋リード */}
-              {post.excerpt && (
-                <p className="mt-4 text-text-secondary font-body leading-relaxed"
-                  style={{ fontSize: '17px' }}>
-                  {post.excerpt}
-                </p>
-              )}
 
               {/* メタ情報（日付・読了時間） */}
               <div className="flex items-center gap-4 mt-5">

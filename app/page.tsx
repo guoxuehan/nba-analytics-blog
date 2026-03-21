@@ -45,12 +45,46 @@ async function HomeContent() {
   const hero = posts[0]
   const gridPosts = posts.slice(1, 9)
 
-  const playerPosts = posts.filter((p) => p.category === 'player_analysis')
-  const tacticsPosts = posts.filter((p) => p.category === 'tactics' || p.category === 'data')
+  const playerPosts  = posts.filter((p) => p.category === 'player_analysis')
+  const tacticsPosts = posts.filter((p) => p.category === 'tactics')
+  const dataPosts    = posts.filter((p) => p.category === 'data')
 
   return (
     <>
-      {/* タグラインバー */}
+      {hero && <HeroArticle post={hero} />}
+
+      <ArticleGrid posts={gridPosts} title="LATEST ARTICLES" />
+
+      <CategorySection
+        title="選手分析"
+        href="/category/player_analysis"
+        posts={playerPosts.slice(0, 4)}
+        layout="grid"
+      />
+
+      <CategorySection
+        title="戦術"
+        href="/category/tactics"
+        posts={tacticsPosts.slice(0, 4)}
+        layout="scroll"
+      />
+
+      <CategorySection
+        title="データ"
+        href="/category/data"
+        posts={dataPosts.slice(0, 4)}
+        layout="scroll"
+      />
+    </>
+  )
+}
+
+// ─── ページエントリ ──────────────────────────────────────────
+
+export default function HomePage() {
+  return (
+    <>
+      {/* タグラインバー — Suspense外で確実にヘッダー直下に表示 */}
       <div
         className="w-full border-b border-border"
         style={{ background: 'var(--bg-secondary)', padding: '12px 0' }}
@@ -63,32 +97,6 @@ async function HomeContent() {
         </p>
       </div>
 
-      {hero && <HeroArticle post={hero} />}
-
-      <ArticleGrid posts={gridPosts} title="LATEST" />
-
-      <CategorySection
-        title="選手分析"
-        href="/category/player_analysis"
-        posts={playerPosts.slice(0, 4)}
-        layout="grid"
-      />
-
-      <CategorySection
-        title="戦術・データ"
-        href="/category/tactics"
-        posts={tacticsPosts.slice(0, 4)}
-        layout="scroll"
-      />
-    </>
-  )
-}
-
-// ─── ページエントリ ──────────────────────────────────────────
-
-export default function HomePage() {
-  return (
-    <>
       <Suspense fallback={<HeroSkeleton />}>
         <Suspense fallback={<GridSkeleton />}>
           <HomeContent />
