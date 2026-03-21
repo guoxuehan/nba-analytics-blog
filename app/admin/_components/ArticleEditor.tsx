@@ -7,7 +7,12 @@ import { TagInput } from './TagInput'
 import { ThumbnailUpload } from './ThumbnailUpload'
 import { saveArticleAction, type ArticleFormData } from '@/app/admin/articles/_actions'
 
-const CATEGORIES = ['選手分析', 'チーム分析', '戦術', 'データ'] as const
+const CATEGORIES = [
+  { value: 'player_analysis', label: '選手分析' },
+  { value: 'team_analysis',   label: 'チーム分析' },
+  { value: 'tactics',         label: '戦術' },
+  { value: 'data',            label: 'データ' },
+] as const
 
 // slug 自動生成（ASCII 抽出 → フォールバックで timestamp）
 function generateSlug(title: string): string {
@@ -23,7 +28,7 @@ function generateSlug(title: string): string {
 const defaultForm: ArticleFormData = {
   title: '',
   slug: '',
-  category: '選手分析',
+  category: 'player_analysis',
   excerpt: '',
   content: '',
   tags: [],
@@ -220,7 +225,7 @@ export function ArticleEditor({ initialData }: { initialData?: ArticleFormData }
               onChange={(e) => update('category', e.target.value)}
               style={{ ...inputStyle }}
             >
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </Field>
 
