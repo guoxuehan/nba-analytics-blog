@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { type Post, getCategoryGradient, formatDate } from '@/lib/posts'
+import { type Post, getCategoryGradient, getCategoryLabel, formatDate } from '@/lib/posts'
 
 // ─── サイドバーの記事アイテム ─────────────────────────────────
 
@@ -21,7 +21,7 @@ function SidebarPostItem({ post }: { post: Post }) {
         <span
           className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent font-heading"
         >
-          {post.category}
+          {getCategoryLabel(post.category)}
         </span>
         <h3
           className="font-heading font-bold text-text-primary leading-[1.25] line-clamp-2 group-hover:text-accent transition-colors duration-150"
