@@ -49,13 +49,13 @@ export default async function AdminCommentsPage() {
                   </p>
                 </td>
                 <td style={{ ...S.td, whiteSpace: 'nowrap' }}>
-                  {comment.articles ? (
+                  {comment.article ? (
                     <Link
-                      href={`/articles/${comment.articles.slug}`}
+                      href={`/articles/${comment.article.slug}`}
                       target="_blank"
                       style={{ color: '#1565C0', textDecoration: 'none', fontSize: '12px' }}
                     >
-                      {comment.articles.title}
+                      {comment.article.title}
                     </Link>
                   ) : (
                     <span style={{ color: '#999', fontSize: '12px' }}>—</span>

@@ -9,7 +9,7 @@ export type AdminComment = {
   author_name: string
   content: string
   created_at: string
-  articles: { title: string; slug: string } | null
+  article: { title: string; slug: string } | null
 }
 
 export async function getAdminComments(): Promise<AdminComment[]> {
@@ -21,7 +21,18 @@ export async function getAdminComments(): Promise<AdminComment[]> {
     .order('created_at', { ascending: false })
 
   if (error || !data) return []
-  return data as AdminComment[]
+
+  return data.map((row) => {
+    const articles = row.articles
+    const article = Array.isArray(articles) ? (articles[0] ?? null) : (articles ?? null)
+    return {
+      id: row.id as string,
+      author_name: row.author_name as string,
+      content: row.content as string,
+      created_at: row.created_at as string,
+      article: article as { title: string; slug: string } | null,
+    }
+  })
 }
 
 export async function deleteCommentAction(id: string): Promise<{ error?: string }> {
