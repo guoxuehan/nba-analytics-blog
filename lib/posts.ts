@@ -320,6 +320,23 @@ export async function getRelatedPosts(
   }
 }
 
+export async function getPostsByCategory(category: string, limit = 20): Promise<Post[]> {
+  try {
+    const { data, error } = await getSupabase()
+      .from('articles')
+      .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
+      .eq('published', true)
+      .eq('category', category)
+      .order('published_at', { ascending: false })
+      .limit(limit)
+
+    if (error || !data || data.length === 0) return []
+    return data as Post[]
+  } catch {
+    return []
+  }
+}
+
 export async function getRecentPosts(excludeSlug: string, limit = 5): Promise<Post[]> {
   try {
     const { data, error } = await getSupabase()

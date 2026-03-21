@@ -45,8 +45,8 @@ async function HomeContent() {
   const hero = posts[0]
   const gridPosts = posts.slice(1, 9)
 
-  const playerPosts = posts.filter((p) => p.category === '選手分析')
-  const tacticsPosts = posts.filter((p) => p.category === '戦術' || p.category === 'データ')
+  const playerPosts = posts.filter((p) => p.category === 'player_analysis')
+  const tacticsPosts = posts.filter((p) => p.category === 'tactics' || p.category === 'data')
 
   return (
     <>
@@ -56,14 +56,14 @@ async function HomeContent() {
 
       <CategorySection
         title="選手分析"
-        href="/players"
+        href="/category/player_analysis"
         posts={playerPosts.slice(0, 4)}
         layout="grid"
       />
 
       <CategorySection
         title="戦術・データ"
-        href="/tactics"
+        href="/category/tactics"
         posts={tacticsPosts.slice(0, 4)}
         layout="scroll"
       />
