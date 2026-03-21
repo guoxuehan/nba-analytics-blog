@@ -18,6 +18,8 @@ import { ArticleContent } from '@/app/components/ArticleContent'
 import { ArticleSidebar } from '@/app/components/ArticleSidebar'
 import { ArticleCardLarge } from '@/app/components/ArticleCardLarge'
 import { ShareButtons } from '@/app/components/ShareButtons'
+import { CommentSection, type Comment } from '@/app/components/CommentSection'
+import { getSupabase } from '@/lib/supabase'
 
 // ─── 静的パス生成 ─────────────────────────────────────────────
 
@@ -72,10 +74,17 @@ export default async function ArticlePage({
   const post = await getPostBySlug(slug)
   if (!post) notFound()
 
-  const [relatedPosts, recentPosts] = await Promise.all([
+  const [relatedPosts, recentPosts, commentsResult] = await Promise.all([
     getRelatedPosts(post.category, post.slug, 4),
     getRecentPosts(post.slug, 5),
+    getSupabase()
+      .from('comments')
+      .select('id, author_name, content, created_at')
+      .eq('article_id', post.id)
+      .order('created_at', { ascending: false }),
   ])
+
+  const initialComments: Comment[] = (commentsResult.data ?? []) as Comment[]
 
   const readingTime = calculateReadingTime(post.content)
   const relatedForBottom = relatedPosts.slice(0, 3)
@@ -255,6 +264,13 @@ export default async function ArticlePage({
             >
               <ArticleSidebar relatedPosts={relatedForSidebar} recentPosts={recentPosts} />
             </aside>
+          </div>
+        </div>
+
+        {/* ── コメントセクション ────────────────────────────────── */}
+        <div className="container-content">
+          <div style={{ maxWidth: '720px' }}>
+            <CommentSection articleId={post.id} initialComments={initialComments} />
           </div>
         </div>
 

@@ -28,6 +28,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/articles" style={{ color: '#ccc', fontSize: '13px', textDecoration: 'none' }}>
               記事一覧
             </Link>
+            <Link href="/admin/comments" style={{ color: '#ccc', fontSize: '13px', textDecoration: 'none' }}>
+              コメント
+            </Link>
             <Link href="/admin/articles/new" style={{ color: '#fff', fontSize: '12px', background: '#D32F2F', padding: '4px 12px', textDecoration: 'none', borderRadius: '2px', fontWeight: 700 }}>
               + 新規作成
             </Link>

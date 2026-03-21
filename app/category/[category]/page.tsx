@@ -45,26 +45,21 @@ export default async function CategoryPage({
 
   return (
     <div className="section-gap">
-      {/* ページヘッダー */}
-      <div className="container-content">
-        <div className="flex items-center gap-3 pb-3 border-b border-border mb-2">
-          <div
-            className="shrink-0"
-            style={{ width: '4px', height: '22px', background: 'var(--accent)', borderRadius: '1px' }}
-            aria-hidden="true"
-          />
-          <h1
-            className="font-heading font-bold text-text-primary uppercase"
-            style={{ fontSize: '13px', letterSpacing: '0.1em' }}
-          >
-            {meta.label}
-          </h1>
-        </div>
-      </div>
-
-      {/* 記事一覧 */}
       {posts.length === 0 ? (
         <div className="container-content">
+          <div className="flex items-center gap-3 pb-3 border-b border-border mb-8">
+            <div
+              className="shrink-0"
+              style={{ width: '4px', height: '22px', background: 'var(--accent)', borderRadius: '1px' }}
+              aria-hidden="true"
+            />
+            <h1
+              className="font-heading font-bold text-text-primary uppercase"
+              style={{ fontSize: '13px', letterSpacing: '0.1em' }}
+            >
+              {meta.label}
+            </h1>
+          </div>
           <p className="text-text-secondary text-sm py-16 text-center">記事がありません</p>
         </div>
       ) : (
