@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(npx next:*)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -v http://localhost:3000/)",
+      "Bash(netstat -ano)",
+      "Bash(npx @next/codemod@canary middleware-to-proxy .)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s \"http://localhost:3000/_next/static/chunks/%5Broot-of-the-server%5D__01w5ymw._.css\")"
     ]
   }
 }
