@@ -80,14 +80,22 @@ export function Footer() {
           </div>
         </div>
 
-        {/* コピーライト */}
-        <div className="mt-8 pt-6 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* コピーライト + ポリシーリンク */}
+        <div className="mt-8 pt-6 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-[12px] text-text-secondary">
-            © {year} Court Vision. All rights reserved.
+            © {year} NBA Court Vision. All rights reserved.
           </p>
-          <p className="text-[12px] text-text-secondary">
-            NBA統計データに基づく独立メディア
-          </p>
+          <nav className="flex flex-wrap gap-x-5 gap-y-1" aria-label="ポリシーリンク">
+            <Link href="/privacy-policy" className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150">
+              プライバシーポリシー
+            </Link>
+            <Link href="/contact" className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150">
+              お問い合わせ
+            </Link>
+            <Link href="/disclaimer" className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150">
+              免責事項
+            </Link>
+          </nav>
         </div>
       </div>
     </footer>
