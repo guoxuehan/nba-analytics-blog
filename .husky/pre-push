@@ -1,0 +1,2 @@
+echo "🔍 pre-push: 型チェックとlintを実行中..."
+npx tsc --noEmit && npm run lint

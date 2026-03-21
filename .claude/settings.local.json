@@ -10,7 +10,9 @@
       "Bash(netstat -ano)",
       "Bash(npx @next/codemod@canary middleware-to-proxy .)",
       "Bash(curl -s http://localhost:3000)",
-      "Bash(curl -s \"http://localhost:3000/_next/static/chunks/%5Broot-of-the-server%5D__01w5ymw._.css\")"
+      "Bash(curl -s \"http://localhost:3000/_next/static/chunks/%5Broot-of-the-server%5D__01w5ymw._.css\")",
+      "Bash(npx husky:*)",
+      "Bash(chmod:*)"
     ]
   }
 }
