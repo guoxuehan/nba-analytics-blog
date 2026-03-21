@@ -5,8 +5,6 @@ export const metadata: Metadata = {
   description: 'NBA COURT VISIONのプライバシーポリシーです。',
 }
 
-const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? 'contact@example.com'
-
 export default function PrivacyPolicyPage() {
   return (
     <div className="container-content py-12">
@@ -42,8 +40,7 @@ export default function PrivacyPolicyPage() {
           <p>当サイトは、必要に応じて本ポリシーを変更することがあります。変更後のプライバシーポリシーは、当サイトに掲載した時点から効力を生じるものとします。</p>
 
           <h2>お問い合わせ</h2>
-          <p>本ポリシーに関するお問い合わせは、以下のメールアドレスまでご連絡ください。</p>
-          <p><strong>NBA COURT VISION 運営</strong><br />{contactEmail}</p>
+          <p>本ポリシーに関するお問い合わせは、当サイトの<a href="/contact">お問い合わせフォーム</a>よりお願いいたします。</p>
         </div>
       </div>
     </div>
