@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getAdminArticles } from './_actions'
-import { deleteArticleAction } from './_actions'
+import { DeleteButton } from './_components/DeleteButton'
 
 const S = {
   table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: '14px', background: '#fff', border: '1px solid #ddd' },
@@ -16,7 +16,6 @@ const S = {
     color: '#fff',
   }),
   link: { color: '#1565C0', textDecoration: 'none' as const, fontWeight: 600 },
-  btnDanger: { fontSize: '12px', color: '#D32F2F', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' },
 }
 
 export default async function AdminArticlesPage({
@@ -110,20 +109,7 @@ export default async function AdminArticlesPage({
                     <Link href={`/articles/${article.slug}`} target="_blank" style={{ fontSize: '12px', color: '#555', textDecoration: 'none' }}>
                       表示
                     </Link>
-                    <form action={async () => {
-                      'use server'
-                      await deleteArticleAction(article.id)
-                    }}>
-                      <button
-                        type="submit"
-                        style={S.btnDanger}
-                        onClick={(e) => {
-                          if (!confirm(`「${article.title}」を削除しますか？`)) e.preventDefault()
-                        }}
-                      >
-                        削除
-                      </button>
-                    </form>
+                    <DeleteButton id={article.id} title={article.title} />
                   </div>
                 </td>
               </tr>
