@@ -37,6 +37,18 @@ export const metadata: Metadata = {
     default: 'NBA COURT VISION — NBAアナリティクス',
   },
   description: 'NBAの高度なアナリティクス、選手分析、戦術解説',
+  openGraph: {
+    siteName: 'NBA COURT VISION',
+    title: 'NBA COURT VISION — NBAアナリティクス',
+    description: 'NBAの高度なアナリティクス、選手分析、戦術解説',
+    type: 'website',
+    locale: 'ja_JP',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NBA COURT VISION — NBAアナリティクス',
+    description: 'NBAの高度なアナリティクス、選手分析、戦術解説',
+  },
   verification: {
     google: '41G1SRV6dpQhDMJROIpMiBCojflXM9voDPxaB75Qock',
   },
