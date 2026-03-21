@@ -132,6 +132,23 @@ export async function getPostsByCategory(category: string, limit = 20): Promise<
   }
 }
 
+export async function getPostsByTag(tag: string, limit = 20): Promise<Post[]> {
+  try {
+    const { data, error } = await getSupabase()
+      .from('articles')
+      .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
+      .eq('published', true)
+      .contains('tags', [tag])
+      .order('published_at', { ascending: false })
+      .limit(limit)
+
+    if (error || !data) return []
+    return data as Post[]
+  } catch {
+    return []
+  }
+}
+
 export async function getRecentPosts(excludeSlug: string, limit = 5): Promise<Post[]> {
   try {
     const { data, error } = await getSupabase()

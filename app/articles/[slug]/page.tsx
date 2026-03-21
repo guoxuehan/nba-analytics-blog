@@ -224,7 +224,7 @@ export default async function ArticlePage({
                   {post.tags.map((tag) => (
                     <Link
                       key={tag}
-                      href={`/tags/${encodeURIComponent(tag)}`}
+                      href={`/tag/${encodeURIComponent(tag)}`}
                       className="px-3 py-1 text-[12px] font-bold uppercase tracking-wider text-text-secondary border border-border hover:border-accent hover:text-accent transition-colors duration-150 font-heading"
                       style={{ borderRadius: '2px' }}
                     >
