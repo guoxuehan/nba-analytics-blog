@@ -96,7 +96,7 @@ npm run dev
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 必須 | Supabase anon（公開）キー |
 | `ADMIN_PASSWORD` | 必須 | 管理画面ログインパスワード |
 | `ANTHROPIC_API_KEY` | 必須 | AI下書き生成用 Claude APIキー |
-| `NEXT_PUBLIC_SITE_URL` | 任意 | OGP用サイトURL（デフォルト: `https://courtvision.jp`） |
+| `NEXT_PUBLIC_SITE_URL` | 任意 | OGP用サイトURL（デフォルト: `https://sports-academia.com`） |
 | `NEXT_PUBLIC_GA_ID` | 任意 | Google AnalyticsトラッキングID |
 
 ## デプロイ方法
