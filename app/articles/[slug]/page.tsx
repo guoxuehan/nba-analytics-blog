@@ -235,16 +235,6 @@ export default async function ArticlePage({
               {/* ── 関連記事（モバイル・タブレット用：lg未満で表示） */}
               {relatedForBottom.length > 0 && (
                 <section className="mt-10 pt-6 border-t border-border lg:hidden">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div
-                      style={{ width: '3px', height: '16px', background: 'var(--accent)', borderRadius: '1px' }}
-                      aria-hidden="true"
-                    />
-                    <h2 className="font-heading font-bold text-text-primary uppercase"
-                      style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
-                      関連記事
-                    </h2>
-                  </div>
                   <ArticleSidebar relatedPosts={relatedForSidebar} recentPosts={recentPosts.slice(0, 3)} />
                 </section>
               )}
