@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useSyncExternalStore } from 'react'
 import { usePathname } from 'next/navigation'
 
 function XIcon() {
@@ -23,13 +23,15 @@ type Props = {
   title: string
 }
 
+const emptySubscribe = () => () => {}
+
 export function ShareButtons({ title }: Props) {
   const pathname = usePathname()
-  const [origin, setOrigin] = useState('')
-
-  useEffect(() => {
-    setOrigin(window.location.origin)
-  }, [])
+  const origin = useSyncExternalStore(
+    emptySubscribe,
+    () => window.location.origin,
+    () => null,
+  )
 
   if (!origin) return null
 
