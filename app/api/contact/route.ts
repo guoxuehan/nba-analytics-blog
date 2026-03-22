@@ -11,8 +11,11 @@ export async function POST(req: NextRequest) {
 
   const { name, email, subject, message } = body
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
   if (!name?.trim()) return Response.json({ error: '名前を入力してください' }, { status: 400 })
   if (!email?.trim()) return Response.json({ error: 'メールアドレスを入力してください' }, { status: 400 })
+  if (!EMAIL_RE.test(email.trim())) return Response.json({ error: 'メールアドレスの形式が正しくありません' }, { status: 400 })
   if (!subject?.trim()) return Response.json({ error: '件名を入力してください' }, { status: 400 })
   if (!message?.trim()) return Response.json({ error: '本文を入力してください' }, { status: 400 })
 

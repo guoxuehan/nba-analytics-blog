@@ -108,6 +108,8 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
     revalidatePath('/admin/articles')
     revalidatePath('/')
     revalidatePath(`/articles/${data.slug}`)
+    revalidatePath('/category/[category]', 'page')
+    revalidatePath('/tag/[tag]', 'page')
     return { success: true, id: data.id }
   }
 
@@ -123,6 +125,8 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
   if (data.published) {
     revalidatePath('/')
     revalidatePath(`/articles/${data.slug}`)
+    revalidatePath('/category/[category]', 'page')
+    revalidatePath('/tag/[tag]', 'page')
   }
   return { success: true, id: created.id }
 }
@@ -132,10 +136,20 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
 export async function deleteArticleAction(id: string): Promise<{ error?: string }> {
   await requireAdminAuth()
 
+  // slug を先に取得して記事詳細ページも revalidate できるようにする
+  const { data: article } = await getSupabaseAdmin()
+    .from('articles')
+    .select('slug')
+    .eq('id', id)
+    .single()
+
   const { error } = await getSupabaseAdmin().from('articles').delete().eq('id', id)
   if (error) return { error: error.message }
 
   revalidatePath('/admin/articles')
   revalidatePath('/')
+  revalidatePath('/category/[category]', 'page')
+  revalidatePath('/tag/[tag]', 'page')
+  if (article?.slug) revalidatePath(`/articles/${article.slug}`)
   return {}
 }

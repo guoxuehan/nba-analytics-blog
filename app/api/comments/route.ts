@@ -2,6 +2,10 @@ import { getSupabase } from '@/lib/supabase'
 import { NextRequest } from 'next/server'
 
 // ─── IP別レート制限（メモリ内、1分間に1投稿まで） ────────────
+// NOTE: 現状はインメモリ実装のため、サーバー再起動や
+//       Vercel のサーバーレス複数インスタンス環境では制限が無効化される。
+// TODO: 将来的には Supabase テーブル（rate_limits）や Upstash Redis を使用して
+//       永続的なレート制限を実装する。
 
 const rateLimitMap = new Map<string, number>()
 

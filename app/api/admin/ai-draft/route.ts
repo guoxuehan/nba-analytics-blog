@@ -13,6 +13,9 @@ export async function POST(request: Request) {
   if (!theme || typeof theme !== 'string') {
     return Response.json({ error: 'theme が必要です' }, { status: 400 })
   }
+  if (theme.length > 500) {
+    return Response.json({ error: 'theme は500文字以内で入力してください' }, { status: 400 })
+  }
 
   const prompt = `あなたはNBAに精通したスポーツアナリストです。
 以下のテーマについて、日本語でデータに基づいた分析記事の下書きを書いてください。

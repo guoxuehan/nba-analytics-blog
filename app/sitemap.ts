@@ -1,7 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { getPublishedPosts } from '@/lib/posts'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://courtvision.jp'
+import { SITE_URL } from '@/lib/constants'
 
 const CATEGORIES = ['player_analysis', 'team_analysis', 'tactics', 'data']
 

@@ -18,6 +18,7 @@ import { ArticleContent } from '@/app/components/ArticleContent'
 import { ArticleSidebar } from '@/app/components/ArticleSidebar'
 import { ArticleCardLarge } from '@/app/components/ArticleCardLarge'
 import { ShareButtons } from '@/app/components/ShareButtons'
+import { SITE_URL } from '@/lib/constants'
 import { CommentSection, type Comment } from '@/app/components/CommentSection'
 import { getSupabase } from '@/lib/supabase'
 
@@ -40,7 +41,7 @@ export async function generateMetadata({
 
   if (!post) return { title: '記事が見つかりません' }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://courtvision.jp'
+  const siteUrl = SITE_URL
 
   return {
     title: post.title,
@@ -91,7 +92,7 @@ export default async function ArticlePage({
   const relatedForSidebar = relatedPosts.slice(0, 3)
 
   // JSON-LD 構造化データ
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://courtvision.jp'
+  const siteUrl = SITE_URL
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
