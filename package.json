@@ -10,7 +10,10 @@
     "prepare": "husky",
     "check": "tsc --noEmit && next lint && next build",
     "test:e2e": "playwright test",
-    "test:links": "playwright test tests/links.spec.ts"
+    "test:links": "playwright test tests/links.spec.ts",
+    "article:generate": "tsx scripts/generate-article.ts",
+    "article:check": "tsx scripts/quality-check.ts",
+    "article:publish": "tsx scripts/publish-article.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -28,10 +31,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.0",
     "husky": "^9.1.7",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
