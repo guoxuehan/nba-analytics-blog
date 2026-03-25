@@ -1,10 +1,12 @@
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { logoutAction } from './login/_actions'
+import { getUnreadContactCount } from './contacts/_actions'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies()
   const isAuthenticated = !!cookieStore.get('admin_session')
+  const unreadContactCount = isAuthenticated ? await getUnreadContactCount() : 0
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f0f0', fontFamily: 'system-ui, sans-serif' }}>
@@ -30,6 +32,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </Link>
             <Link href="/admin/comments" style={{ color: '#ccc', fontSize: '13px', textDecoration: 'none' }}>
               コメント
+            </Link>
+            <Link href="/admin/contacts" style={{ color: '#ccc', fontSize: '13px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              お問い合わせ
+              {unreadContactCount > 0 && (
+                <span style={{
+                  background: '#D32F2F', color: '#fff', fontSize: '10px', fontWeight: 700,
+                  borderRadius: '10px', padding: '1px 6px', lineHeight: 1.6, minWidth: '18px', textAlign: 'center',
+                }}>
+                  {unreadContactCount}
+                </span>
+              )}
             </Link>
             <Link href="/admin/articles/new" style={{ color: '#fff', fontSize: '12px', background: '#D32F2F', padding: '4px 12px', textDecoration: 'none', borderRadius: '2px', fontWeight: 700 }}>
               + 新規作成
