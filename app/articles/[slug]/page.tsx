@@ -13,6 +13,7 @@ import {
   getCategoryGradient,
   getCategoryLabel,
   formatDate,
+  getPostDate,
 } from '@/lib/posts'
 import { ArticleContent } from '@/app/components/ArticleContent'
 import { ArticleSidebar } from '@/app/components/ArticleSidebar'
@@ -50,7 +51,7 @@ export async function generateMetadata({
       title: post.title,
       description: post.excerpt ?? undefined,
       type: 'article',
-      publishedTime: post.published_at,
+      publishedTime: getPostDate(post),
       url: `${siteUrl}/articles/${post.slug}`,
       siteName: 'NBA COURT VISION',
       ...(post.thumbnail_url ? { images: [{ url: post.thumbnail_url }] } : {}),
@@ -98,8 +99,8 @@ export default async function ArticlePage({
     '@type': 'Article',
     headline: post.title,
     description: post.excerpt ?? '',
-    datePublished: post.published_at,
-    dateModified: post.published_at,
+    datePublished: getPostDate(post),
+    dateModified: getPostDate(post),
     url: `${siteUrl}/articles/${post.slug}`,
     publisher: {
       '@type': 'Organization',
@@ -158,11 +159,11 @@ export default async function ArticlePage({
               {/* メタ情報（日付・読了時間） */}
               <div className="flex items-center gap-4 mt-5">
                 <time
-                  dateTime={post.published_at}
+                  dateTime={getPostDate(post)}
                   className="text-text-secondary font-body"
                   style={{ fontSize: '13px' }}
                 >
-                  {formatDate(post.published_at)}
+                  {formatDate(getPostDate(post))}
                 </time>
                 <span className="text-border" aria-hidden="true">|</span>
                 <span

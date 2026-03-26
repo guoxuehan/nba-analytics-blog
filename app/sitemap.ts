@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { getPublishedPosts } from '@/lib/posts'
+import { getPublishedPosts, getPostDate } from '@/lib/posts'
 import { SITE_URL } from '@/lib/constants'
 
 const CATEGORIES = ['player_analysis', 'team_analysis', 'tactics', 'data']
@@ -22,7 +22,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const articlePages: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${SITE_URL}/articles/${post.slug}`,
-    lastModified: new Date(post.published_at),
+    lastModified: new Date(getPostDate(post)),
     changeFrequency: 'monthly' as const,
     priority: 0.6,
   }))

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { type Post, getCategoryGradient, getCategoryLabel, formatDate } from '@/lib/posts'
+import { type Post, getCategoryGradient, getCategoryLabel, formatDate, getPostDate } from '@/lib/posts'
 
 type Props = { post: Post }
 
@@ -44,10 +44,10 @@ export function ArticleCardSmall({ post }: Props) {
           </h3>
 
           <time
-            dateTime={post.published_at}
+            dateTime={getPostDate(post)}
             className="text-[11px] text-text-secondary mt-auto font-body"
           >
-            {formatDate(post.published_at)}
+            {formatDate(getPostDate(post))}
           </time>
         </div>
       </Link>

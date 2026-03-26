@@ -7,7 +7,8 @@ export type Post = {
   title: string
   excerpt: string | null
   category: string
-  published_at: string
+  published_at: string | null
+  created_at: string
   thumbnail_url: string | null
   slug: string
   published: boolean
@@ -49,13 +50,27 @@ export function getCategoryGradient(category: string): string {
   return CATEGORY_GRADIENTS[category] ?? 'linear-gradient(155deg, #0d0d0d 0%, #1a1a1a 100%)'
 }
 
-// ─── 日付フォーマット ─────────────────────────────────────────
+// ─── 日付ユーティリティ ──────────────────────────────────────
 
-export function formatDate(dateString: string): string {
+/**
+ * 表示用の日付文字列を返す。
+ * published_at が null の場合は created_at をフォールバックとして使用。
+ */
+export function getPostDate(post: { published_at: string | null; created_at: string }): string {
+  return post.published_at ?? post.created_at
+}
+
+/**
+ * ISO 日付文字列を「2026年3月25日」形式にフォーマットする。
+ * タイムゾーンは Asia/Tokyo に統一。
+ */
+export function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('ja-JP', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'Asia/Tokyo',
   })
 }
 
@@ -65,7 +80,7 @@ export async function getPublishedPosts(limit = 20): Promise<Post[]> {
   try {
     const { data, error } = await getSupabase()
       .from('articles')
-      .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
+      .select('id, title, excerpt, category, published_at, created_at, thumbnail_url, slug, published')
       .eq('published', true)
       .order('published_at', { ascending: false })
       .limit(limit)
@@ -101,7 +116,7 @@ export async function getRelatedPosts(
   try {
     const { data, error } = await getSupabase()
       .from('articles')
-      .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
+      .select('id, title, excerpt, category, published_at, created_at, thumbnail_url, slug, published')
       .eq('published', true)
       .eq('category', category)
       .neq('slug', currentSlug)
@@ -119,7 +134,7 @@ export async function getPostsByCategory(category: string, limit = 20): Promise<
   try {
     const { data, error } = await getSupabase()
       .from('articles')
-      .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
+      .select('id, title, excerpt, category, published_at, created_at, thumbnail_url, slug, published')
       .eq('published', true)
       .eq('category', category)
       .order('published_at', { ascending: false })
@@ -136,7 +151,7 @@ export async function getPostsByTag(tag: string, limit = 20): Promise<Post[]> {
   try {
     const { data, error } = await getSupabase()
       .from('articles')
-      .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
+      .select('id, title, excerpt, category, published_at, created_at, thumbnail_url, slug, published')
       .eq('published', true)
       .contains('tags', [tag])
       .order('published_at', { ascending: false })
@@ -153,7 +168,7 @@ export async function getRecentPosts(excludeSlug: string, limit = 5): Promise<Po
   try {
     const { data, error } = await getSupabase()
       .from('articles')
-      .select('id, title, excerpt, category, published_at, thumbnail_url, slug, published')
+      .select('id, title, excerpt, category, published_at, created_at, thumbnail_url, slug, published')
       .eq('published', true)
       .neq('slug', excludeSlug)
       .order('published_at', { ascending: false })

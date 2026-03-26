@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { type Post, getCategoryGradient, getCategoryLabel, formatDate } from '@/lib/posts'
+import { type Post, getCategoryGradient, getCategoryLabel, formatDate, getPostDate } from '@/lib/posts'
 
 // ─── サイドバーの記事アイテム ─────────────────────────────────
 
@@ -29,8 +29,11 @@ function SidebarPostItem({ post }: { post: Post }) {
         >
           {post.title}
         </h3>
-        <time className="text-[11px] text-text-secondary font-body">
-          {formatDate(post.published_at)}
+        <time
+          dateTime={getPostDate(post)}
+          className="text-[11px] text-text-secondary font-body"
+        >
+          {formatDate(getPostDate(post))}
         </time>
       </div>
     </Link>

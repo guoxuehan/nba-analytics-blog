@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { type Post, getCategoryGradient, getCategoryLabel, formatDate } from '@/lib/posts'
+import { type Post, getCategoryGradient, getCategoryLabel, formatDate, getPostDate } from '@/lib/posts'
 
 type Props = { post: Post }
 
@@ -99,10 +99,10 @@ export function HeroArticle({ post }: Props) {
 
           {/* 日付 */}
           <time
-            dateTime={post.published_at}
+            dateTime={getPostDate(post)}
             className="mt-5 block text-white/50 text-[11px] uppercase tracking-[0.1em] font-body"
           >
-            {formatDate(post.published_at)}
+            {formatDate(getPostDate(post))}
           </time>
         </div>
       </Link>
