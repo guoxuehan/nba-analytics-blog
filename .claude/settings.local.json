@@ -14,7 +14,9 @@
       "Bash(npx husky:*)",
       "Bash(chmod:*)",
       "Bash(find '/c/Users/Xuehan X1 PC/Desktop/nba-analytics-blog' -type f -name *migration* -o -name *schema*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(npx tsx --eval \":*)",
+      "Bash(node --import tsx/esm --eval \":*)"
     ]
   }
 }

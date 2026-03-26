@@ -8,6 +8,7 @@ import * as readline from 'readline'
 import * as dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import { parseDraft } from './_parse-draft'
+import { resolveThumbnail } from './_thumbnail'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -123,17 +124,23 @@ async function main() {
     process.exit(1)
   }
 
+  // ── サムネイル解決 ───────────────────────────────────────────
+  process.stdout.write('サムネイルを取得中...')
+  const thumbnail = await resolveThumbnail(meta, meta.slug, supabase)
+  console.log(` サムネイル: ${thumbnail.label}`)
+
   // ── 内容確認 ─────────────────────────────────────────────────
   console.log('\n' + '═'.repeat(60))
   console.log('  投稿内容の確認')
   console.log('═'.repeat(60))
-  console.log(`\nタイトル : ${meta.title}`)
-  console.log(`slug     : ${meta.slug}`)
-  console.log(`カテゴリ : ${meta.category}`)
-  console.log(`タグ     : ${meta.tags.join(', ') || '（なし）'}`)
-  console.log(`文字数   : ${body.length}文字`)
-  console.log(`excerpt  : ${meta.excerpt || '（なし）'}`)
-  console.log(`\n公開後URL: ${SITE_URL}/articles/${meta.slug}`)
+  console.log(`\nタイトル   : ${meta.title}`)
+  console.log(`slug       : ${meta.slug}`)
+  console.log(`カテゴリ   : ${meta.category}`)
+  console.log(`タグ       : ${meta.tags.join(', ') || '（なし）'}`)
+  console.log(`文字数     : ${body.length}文字`)
+  console.log(`excerpt    : ${meta.excerpt || '（なし）'}`)
+  console.log(`サムネイル : ${thumbnail.label}`)
+  console.log(`\n公開後URL  : ${SITE_URL}/articles/${meta.slug}`)
   console.log('')
 
   const answer = await ask('Supabaseに投稿しますか？ (y/n): ')
@@ -153,6 +160,7 @@ async function main() {
     tags: meta.tags,
     excerpt: meta.excerpt || null,
     content: body,
+    thumbnail_url: thumbnail.url ?? null,
     published: true,
     published_at: now,
     created_at: now,
