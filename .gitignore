@@ -45,3 +45,9 @@ next-env.d.ts
 
 # ローカルサムネイル画像（大容量バイナリはgit管理外）
 /thumbnails/
+
+# 自動パイプライン生成ファイル
+/data/
+/logs/
+/articles-draft/needs-review/
+/articles-draft/x-posts/

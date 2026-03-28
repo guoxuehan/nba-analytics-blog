@@ -13,7 +13,11 @@
     "test:links": "playwright test tests/links.spec.ts",
     "article:generate": "tsx scripts/generate-article.ts",
     "article:check": "tsx scripts/quality-check.ts",
-    "article:publish": "tsx scripts/publish-article.ts"
+    "article:publish": "tsx scripts/publish-article.ts",
+    "pipeline": "tsx scripts/daily-pipeline.ts",
+    "pipeline:fetch": "tsx scripts/fetch-nba-data.ts",
+    "pipeline:generate": "tsx scripts/auto-generate.ts",
+    "pipeline:publish": "tsx scripts/auto-publish.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

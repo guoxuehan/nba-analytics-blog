@@ -16,7 +16,8 @@
       "Bash(find '/c/Users/Xuehan X1 PC/Desktop/nba-analytics-blog' -type f -name *migration* -o -name *schema*)",
       "Bash(npx tsx:*)",
       "Bash(npx tsx --eval \":*)",
-      "Bash(node --import tsx/esm --eval \":*)"
+      "Bash(node --import tsx/esm --eval \":*)",
+      "Bash(find . -maxdepth 3 -not -path */node_modules/* -not -path */.next/* -type d)"
     ]
   }
 }
