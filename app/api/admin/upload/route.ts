@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { verifyAdminRequest } from '@/lib/admin-auth'
+import { optimizeImage } from '@/lib/image-optimizer'
 
 const BUCKET = 'post-images'
 
@@ -21,16 +22,16 @@ export async function POST(request: Request) {
     return Response.json({ error: '画像ファイルが必要です' }, { status: 400 })
   }
 
-  const ext = file.name.split('.').pop() ?? 'jpg'
-  const fileName = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const fileName = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
 
-  const buffer = await file.arrayBuffer()
+  const raw = await file.arrayBuffer()
+  const optimized = await optimizeImage(raw)
   const supabaseAdmin = getSupabaseAdmin()
 
   const { error } = await supabaseAdmin.storage
     .from(BUCKET)
-    .upload(fileName, new Uint8Array(buffer), {
-      contentType: file.type,
+    .upload(fileName, optimized, {
+      contentType: 'image/jpeg',
       upsert: false,
     })
 

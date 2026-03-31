@@ -19,7 +19,7 @@ export function ArticleCardSmall({ post }: Props) {
               alt={post.title}
               fill
               className="object-cover"
-              sizes="76px"
+              sizes="100px"
             />
           ) : (
             <div

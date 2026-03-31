@@ -1,22 +1,35 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { type Post, getCategoryGradient, getCategoryLabel, formatDate, getPostDate } from '@/lib/posts'
 
 // ─── サイドバーの記事アイテム ─────────────────────────────────
 
 function SidebarPostItem({ post }: { post: Post }) {
-  const bgStyle = post.thumbnail_url
-    ? { backgroundImage: `url(${post.thumbnail_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: getCategoryGradient(post.category) }
-
   return (
     <Link
       href={`/articles/${post.slug}`}
       className="group flex gap-3 py-3 items-start border-b border-border last:border-b-0"
     >
       <div
-        className="shrink-0 rounded-[2px] overflow-hidden"
-        style={{ width: '64px', height: '64px', ...bgStyle }}
-      />
+        className="shrink-0 relative rounded-[2px] overflow-hidden"
+        style={{ width: '64px', height: '64px' }}
+      >
+        {post.thumbnail_url ? (
+          <Image
+            src={post.thumbnail_url}
+            alt={post.title}
+            fill
+            className="object-cover"
+            sizes="80px"
+          />
+        ) : (
+          <div
+            className="w-full h-full"
+            style={{ background: getCategoryGradient(post.category) }}
+            aria-hidden="true"
+          />
+        )}
+      </div>
       <div className="flex flex-col min-w-0 gap-1">
         <span
           className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent font-heading"

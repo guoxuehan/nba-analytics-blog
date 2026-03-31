@@ -8,6 +8,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DraftMeta } from './_parse-draft'
+import { optimizeImage } from '../lib/image-optimizer'
 
 const THUMBNAILS_DIR = path.resolve(process.cwd(), 'thumbnails')
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
@@ -135,15 +136,10 @@ async function uploadLocalFile(
   slug: string,
   supabase: SupabaseClient,
 ): Promise<string | null> {
-  const ext = path.extname(filepath).slice(1).toLowerCase()
-  const contentType =
-    ext === 'png' ? 'image/png' :
-    ext === 'webp' ? 'image/webp' :
-    ext === 'gif' ? 'image/gif' : 'image/jpeg'
-  const storageKey = `articles/${slug}-thumbnail.${ext}`
-
-  const buffer = fs.readFileSync(filepath)
-  return uploadBuffer(buffer, storageKey, contentType, supabase)
+  const raw = fs.readFileSync(filepath)
+  const optimized = await optimizeImage(raw)
+  const storageKey = `articles/${slug}-thumbnail.jpg`
+  return uploadBuffer(optimized, storageKey, 'image/jpeg', supabase)
 }
 
 async function uploadFromUrl(
@@ -153,9 +149,10 @@ async function uploadFromUrl(
 ): Promise<string | null> {
   const res = await fetch(imageUrl)
   if (!res.ok) return null
-  const buffer = await res.arrayBuffer()
+  const raw = await res.arrayBuffer()
+  const optimized = await optimizeImage(raw)
   const storageKey = `articles/${slug}-thumbnail.jpg`
-  return uploadBuffer(buffer, storageKey, 'image/jpeg', supabase)
+  return uploadBuffer(optimized, storageKey, 'image/jpeg', supabase)
 }
 
 // ── Unsplash API ────────────────────────────────────────────────
