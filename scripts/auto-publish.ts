@@ -7,6 +7,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 import { parseDraft } from './_parse-draft'
 import { resolveThumbnail } from './_thumbnail'
@@ -101,13 +102,12 @@ function extractXPost(content: string): string | null {
 }
 
 // ─── Main ────────────────────────────────────────────────────────────
-async function main(): Promise<{ published: number; needsReview: number; skipped: number }> {
+export async function run(): Promise<{ published: number; needsReview: number; skipped: number }> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error('❌ Supabase環境変数が設定されていません')
-    process.exit(1)
+    throw new Error('Supabase環境変数（NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY）が設定されていません')
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey)
@@ -246,17 +246,23 @@ async function main(): Promise<{ published: number; needsReview: number; skipped
   return { published, needsReview, skipped }
 }
 
-main()
-  .then(({ published, needsReview, skipped }) => {
-    console.log('\n' + '━'.repeat(60))
-    console.log('  自動公開 完了')
-    console.log('━'.repeat(60))
-    console.log(
-      `  公開: ${published}本 / レビュー待ち: ${needsReview}本 / スキップ: ${skipped}本`,
-    )
-    console.log('')
-  })
-  .catch((err) => {
-    console.error('エラー:', err instanceof Error ? err.message : err)
-    process.exit(1)
-  })
+const isMain = process.argv[1]
+  ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  : false
+
+if (isMain) {
+  run()
+    .then(({ published, needsReview, skipped }) => {
+      console.log('\n' + '━'.repeat(60))
+      console.log('  自動公開 完了')
+      console.log('━'.repeat(60))
+      console.log(
+        `  公開: ${published}本 / レビュー待ち: ${needsReview}本 / スキップ: ${skipped}本`,
+      )
+      console.log('')
+    })
+    .catch((err) => {
+      console.error('❌', err instanceof Error ? err.message : err)
+      process.exit(1)
+    })
+}

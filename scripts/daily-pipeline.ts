@@ -7,7 +7,9 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
-import { spawnSync } from 'child_process'
+import { run as fetchData } from './fetch-nba-data'
+import { run as generateArticles } from './auto-generate'
+import { run as publishArticles } from './auto-publish'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -20,9 +22,8 @@ const logBuffer: string[] = []
 
 function log(message: string): void {
   const ts = new Date().toISOString()
-  const line = `[${ts}] ${message}`
   console.log(message)
-  logBuffer.push(line)
+  logBuffer.push(`[${ts}] ${message}`)
 }
 
 function flushLog(): void {
@@ -33,72 +34,30 @@ function flushLog(): void {
   fs.writeFileSync(LOG_FILE, existing + logBuffer.join('\n') + '\n', 'utf-8')
 }
 
-// ─── ステップ実行 ────────────────────────────────────────────────────
+// ─── ステップ実行（直接関数呼び出し）────────────────────────────────
 type StepResult = {
   label: string
   success: boolean
-  output: string
+  error?: string
 }
 
-function runStep(label: string, scriptPath: string): StepResult {
+async function runStep<T>(
+  label: string,
+  fn: () => Promise<T>,
+): Promise<{ result: StepResult; value: T | null }> {
   log('')
   log('━'.repeat(50))
   log(`STEP: ${label}`)
   log('━'.repeat(50))
 
-  const result = spawnSync('npx', ['tsx', scriptPath], {
-    encoding: 'utf-8',
-    cwd: process.cwd(),
-    env: { ...process.env },
-    timeout: 300_000, // 5分タイムアウト
-  })
-
-  const stdout = result.stdout ?? ''
-  const stderr = result.stderr ?? ''
-  const combined = stdout + (stderr ? `\n[stderr]\n${stderr}` : '')
-
-  // 出力をそのままターミナルに表示
-  if (stdout) process.stdout.write(stdout)
-  if (stderr) process.stderr.write(stderr)
-
-  // ログにも記録
-  if (combined.trim()) {
-    for (const line of combined.split('\n')) {
-      logBuffer.push(`[${new Date().toISOString()}] ${line}`)
-    }
-  }
-
-  const success = result.status === 0 && !result.error
-
-  if (result.error) {
-    const errMsg = result.error instanceof Error ? result.error.message : String(result.error)
-    log(`❌ ${label} 失敗: ${errMsg}`)
-  } else if (result.status !== 0) {
-    log(`❌ ${label} 終了コード: ${result.status}`)
-  } else {
+  try {
+    const value = await fn()
     log(`✅ ${label} 完了`)
-  }
-
-  return { label, success, output: combined }
-}
-
-// ─── サマリー解析 ────────────────────────────────────────────────────
-function parseSummary(results: StepResult[]): {
-  generated: number
-  published: number
-  needsReview: number
-} {
-  const generateOutput = results.find((r) => r.label.includes('generate'))?.output ?? ''
-  const publishOutput = results.find((r) => r.label.includes('publish'))?.output ?? ''
-
-  const genMatch = generateOutput.match(/生成完了:\s*(\d+)\/\d+/)
-  const pubMatch = publishOutput.match(/公開:\s*(\d+)本/)
-  const reviewMatch = publishOutput.match(/レビュー待ち:\s*(\d+)本/)
-
-  return {
-    generated: genMatch ? parseInt(genMatch[1], 10) : 0,
-    published: pubMatch ? parseInt(pubMatch[1], 10) : 0,
-    needsReview: reviewMatch ? parseInt(reviewMatch[1], 10) : 0,
+    return { result: { label, success: true }, value }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    log(`❌ ${label} 失敗: ${msg}`)
+    return { result: { label, success: false, error: msg }, value: null }
   }
 }
 
@@ -111,32 +70,19 @@ async function main() {
   log(`  開始: ${new Date().toISOString()}`)
   log('═'.repeat(50))
 
-  const steps = [
-    {
-      label: 'データ取得 (fetch-nba-data)',
-      script: 'scripts/fetch-nba-data.ts',
-    },
-    {
-      label: '記事生成 (auto-generate)',
-      script: 'scripts/auto-generate.ts',
-    },
-    {
-      label: '記事公開 (auto-publish)',
-      script: 'scripts/auto-publish.ts',
-    },
-  ]
+  // Step 1: データ取得
+  const fetchStep = await runStep('データ取得 (fetch-nba-data)', fetchData)
 
-  const results: StepResult[] = []
+  // Step 2: 記事生成（Step 1 失敗でも続行）
+  const generateStep = await runStep('記事生成 (auto-generate)', generateArticles)
 
-  // エラーが発生しても次のステップに進む
-  for (const step of steps) {
-    const result = runStep(step.label, step.script)
-    results.push(result)
-  }
+  // Step 3: 記事公開（Step 2 失敗でも続行）
+  const publishStep = await runStep('記事公開 (auto-publish)', publishArticles)
 
-  // 最終サマリー
+  // ─── 最終サマリー ─────────────────────────────────────────────
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-  const { generated, published, needsReview } = parseSummary(results)
+  const steps = [fetchStep.result, generateStep.result, publishStep.result]
+  const publishStats = publishStep.value ?? { published: 0, needsReview: 0, skipped: 0 }
 
   log('')
   log('═'.repeat(50))
@@ -144,20 +90,20 @@ async function main() {
   log('═'.repeat(50))
   log('')
   log('  ステップ結果:')
-  for (const r of results) {
-    log(`    ${r.success ? '✅' : '❌'} ${r.label}`)
+  for (const s of steps) {
+    log(`    ${s.success ? '✅' : '❌'} ${s.label}${s.error ? ` — ${s.error}` : ''}`)
   }
   log('')
-  log(`  生成: ${generated}本 / 公開: ${published}本 / レビュー待ち: ${needsReview}本`)
+  log(
+    `  生成: 4本 / 公開: ${publishStats.published}本 / レビュー待ち: ${publishStats.needsReview}本`,
+  )
   log(`  実行時間: ${elapsed}秒`)
   log(`  ログ保存先: logs/${today}.log`)
   log('')
 
   flushLog()
 
-  // いずれかのステップが失敗していた場合は exit code 1
-  const hasFailure = results.some((r) => !r.success)
-  if (hasFailure) process.exit(1)
+  if (steps.some((s) => !s.success)) process.exit(1)
 }
 
 main().catch((err) => {

@@ -1,17 +1,19 @@
 /**
  * NBA最新データ取得スクリプト
- * - balldontlie API v1 から昨夜の試合結果・スタッツを取得
+ * - balldontlie API v2 から昨夜の試合結果・スタッツを取得
+ *   APIキー（BALLDONTLIE_API_KEY）がない場合はスキップ
  * - data/nba-latest.json に保存
  * - NBA Stats API からスタンディングを取得して data/standings.json に保存
  */
 import * as fs from 'fs'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
 const DATA_DIR = path.resolve(process.cwd(), 'data')
-const BALLDONTLIE_BASE = 'https://www.balldontlie.io/api/v1'
+const BALLDONTLIE_BASE = 'https://api.balldontlie.io/v1'
 
 // --- Types ---
 type BDLTeam = {
@@ -93,7 +95,7 @@ export type NBALatestData = {
   topScorers: TopScorer[]
 }
 
-type NBAStandingTeam = {
+export type NBAStandingTeam = {
   teamId: string
   teamCity: string
   teamName: string
@@ -126,7 +128,7 @@ function ensureDataDir(): void {
   }
 }
 
-async function fetchJson<T>(url: string, headers?: Record<string, string>): Promise<T | null> {
+async function fetchJson<T>(url: string, headers: Record<string, string> = {}): Promise<T | null> {
   try {
     const res = await fetch(url, { headers })
     if (!res.ok) {
@@ -141,15 +143,24 @@ async function fetchJson<T>(url: string, headers?: Record<string, string>): Prom
 }
 
 // --- balldontlie API ---
+// キーがない場合は空オブジェクトを返す（undefined を fetch に渡さないようにする）
+function getBdlHeaders(): Record<string, string> {
+  const key = process.env.BALLDONTLIE_API_KEY
+  return key ? { Authorization: key } : {}
+}
+
 async function fetchGames(date: string): Promise<BDLGame[]> {
+  const headers = getBdlHeaders()
   const url = `${BALLDONTLIE_BASE}/games?dates[]=${date}&per_page=100`
-  const data = await fetchJson<{ data: BDLGame[] }>(url)
+  const data = await fetchJson<{ data: BDLGame[] }>(url, headers)
   return data?.data ?? []
 }
 
 async function fetchStats(date: string): Promise<BDLStat[]> {
+  const headers = getBdlHeaders()
+  console.log(`  [debug] stats Authorization: ${headers.Authorization ? '設定あり' : '未設定'}`)
   const url = `${BALLDONTLIE_BASE}/stats?dates[]=${date}&per_page=100`
-  const data = await fetchJson<{ data: BDLStat[] }>(url)
+  const data = await fetchJson<{ data: BDLStat[] }>(url, headers)
   return data?.data ?? []
 }
 
@@ -207,7 +218,7 @@ async function fetchStandings(): Promise<{ east: NBAStandingTeam[]; west: NBASta
 }
 
 // --- Main ---
-async function main() {
+export async function run() {
   console.log('━'.repeat(50))
   console.log('  NBA データ取得')
   console.log('━'.repeat(50))
@@ -216,55 +227,64 @@ async function main() {
   const date = getYesterdayDate()
   console.log(`\n対象日付: ${date}`)
 
-  // ── 試合データ取得 ───────────────────────
-  process.stdout.write('試合データを取得中...')
-  const games = await fetchGames(date)
-  console.log(` ${games.length}試合`)
+  // ── balldontlie API（APIキーがある場合のみ）──────────
+  const hasBdlKey = !!process.env.BALLDONTLIE_API_KEY
+  let gameSummaries: GameSummary[] = []
+  let topScorers: TopScorer[] = []
 
-  const finalGames = games.filter(
-    (g) => g.status === 'Final' || /final/i.test(g.status),
-  )
+  if (!hasBdlKey) {
+    console.log('⚠️  BALLDONTLIE_API_KEY が未設定 → 試合データ取得をスキップ')
+  } else {
+    // ── 試合データ取得 ─────────────────────────
+    process.stdout.write('試合データを取得中...')
+    const games = await fetchGames(date)
+    console.log(` ${games.length}試合`)
 
-  const gameSummaries: GameSummary[] = finalGames.map((g) => ({
-    id: g.id,
-    homeTeam: g.home_team.full_name,
-    homeTeamAbbr: g.home_team.abbreviation,
-    homeScore: g.home_team_score,
-    awayTeam: g.visitor_team.full_name,
-    awayTeamAbbr: g.visitor_team.abbreviation,
-    awayScore: g.visitor_team_score,
-    scoreDiff: Math.abs(g.home_team_score - g.visitor_team_score),
-    winner:
-      g.home_team_score > g.visitor_team_score
-        ? g.home_team.full_name
-        : g.visitor_team.full_name,
-    status: g.status,
-  }))
+    const finalGames = games.filter(
+      (g) => g.status === 'Final' || /final/i.test(g.status),
+    )
 
-  // ── スタッツ取得 ─────────────────────────
-  process.stdout.write('選手スタッツを取得中...')
-  const stats = await fetchStats(date)
-  console.log(` ${stats.length}件`)
-
-  const topScorers: TopScorer[] = stats
-    .filter((s) => (s.pts ?? 0) > 0)
-    .sort((a, b) => b.pts - a.pts)
-    .slice(0, 5)
-    .map((s) => ({
-      playerName: `${s.player.first_name} ${s.player.last_name}`,
-      team: s.team.full_name,
-      teamAbbr: s.team.abbreviation,
-      pts: s.pts,
-      reb: s.reb,
-      ast: s.ast,
-      gameId: s.game.id,
+    gameSummaries = finalGames.map((g) => ({
+      id: g.id,
+      homeTeam: g.home_team.full_name,
+      homeTeamAbbr: g.home_team.abbreviation,
+      homeScore: g.home_team_score,
+      awayTeam: g.visitor_team.full_name,
+      awayTeamAbbr: g.visitor_team.abbreviation,
+      awayScore: g.visitor_team_score,
+      scoreDiff: Math.abs(g.home_team_score - g.visitor_team_score),
+      winner:
+        g.home_team_score > g.visitor_team_score
+          ? g.home_team.full_name
+          : g.visitor_team.full_name,
+      status: g.status,
     }))
+
+    // ── スタッツ取得 ───────────────────────────
+    process.stdout.write('選手スタッツを取得中...')
+    const stats = await fetchStats(date)
+    console.log(` ${stats.length}件`)
+
+    topScorers = stats
+      .filter((s) => (s.pts ?? 0) > 0)
+      .sort((a, b) => b.pts - a.pts)
+      .slice(0, 5)
+      .map((s) => ({
+        playerName: `${s.player.first_name} ${s.player.last_name}`,
+        team: s.team.full_name,
+        teamAbbr: s.team.abbreviation,
+        pts: s.pts,
+        reb: s.reb,
+        ast: s.ast,
+        gameId: s.game.id,
+      }))
+  }
 
   // ── nba-latest.json 保存 ─────────────────
   const nbaData: NBALatestData = {
     date,
     fetchedAt: new Date().toISOString(),
-    gamesCount: finalGames.length,
+    gamesCount: gameSummaries.length,
     games: gameSummaries,
     topScorers,
   }
@@ -274,7 +294,7 @@ async function main() {
     JSON.stringify(nbaData, null, 2),
     'utf-8',
   )
-  console.log(`\n✅ data/nba-latest.json を保存（${finalGames.length}試合 / 得点上位${topScorers.length}人）`)
+  console.log(`\n✅ data/nba-latest.json を保存（${gameSummaries.length}試合 / 得点上位${topScorers.length}人）`)
 
   // ── 順位表取得 ───────────────────────────
   process.stdout.write('\n順位表を取得中...')
@@ -303,7 +323,14 @@ async function main() {
   console.log('\n完了\n')
 }
 
-main().catch((err) => {
-  console.error('エラー:', err instanceof Error ? err.message : err)
-  process.exit(1)
-})
+// 直接実行された場合のみ main として動作
+const isMain = process.argv[1]
+  ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  : false
+
+if (isMain) {
+  run().catch((err) => {
+    console.error('エラー:', err instanceof Error ? err.message : err)
+    process.exit(1)
+  })
+}

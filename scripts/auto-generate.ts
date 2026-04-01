@@ -8,8 +8,9 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
 import Anthropic from '@anthropic-ai/sdk'
-import type { NBALatestData } from './fetch-nba-data'
+import type { NBALatestData, NBAStandingTeam } from './fetch-nba-data'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -88,10 +89,86 @@ X投稿文：
 - 各280文字以内、#NBA + 関連タグ2〜3個、URLは [URL]
 `.trim()
 
+// ─── standings.json の読み込み ────────────────────────────────────────
+type StandingsData = {
+  season: string
+  east: NBAStandingTeam[]
+  west: NBAStandingTeam[]
+}
+
+function loadStandings(): StandingsData | null {
+  const p = path.join(DATA_DIR, 'standings.json')
+  if (!fs.existsSync(p)) return null
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf-8')) as StandingsData
+  } catch {
+    return null
+  }
+}
+
+// ─── 順位表ベースのテーマ生成 ────────────────────────────────────────
+function standingsThemes(standings: StandingsData, date: string): ArticleTheme[] {
+  const themes: ArticleTheme[] = []
+  const { east, west } = standings
+
+  // 1位チームの分析
+  const eastFirst = east[0]
+  if (eastFirst) {
+    themes.push({
+      id: 'east-leader',
+      title: `${eastFirst.teamCity} ${eastFirst.teamName}東地区首位の強さを解剖`,
+      prompt:
+        `${date}時点、${eastFirst.teamCity} ${eastFirst.teamName}が東地区首位に立っています（${eastFirst.wins}勝${eastFirst.losses}敗・勝率${(eastFirst.winPct * 100).toFixed(1)}%）。` +
+        `この成績を支える戦術・ロスター構成・強みと弱点を徹底分析してください。`,
+    })
+  }
+
+  const westFirst = west[0]
+  if (westFirst) {
+    themes.push({
+      id: 'west-leader',
+      title: `${westFirst.teamCity} ${westFirst.teamName}西地区首位の実力を分析`,
+      prompt:
+        `${date}時点、${westFirst.teamCity} ${westFirst.teamName}が西地区首位に立っています（${westFirst.wins}勝${westFirst.losses}敗・勝率${(westFirst.winPct * 100).toFixed(1)}%）。` +
+        `チームの特徴、スター選手のパフォーマンス、優勝候補としての評価を論じてください。`,
+    })
+  }
+
+  // プレーイン争い（7〜10位）
+  const eastBubble = east.slice(6, 10)
+  if (eastBubble.length >= 2) {
+    const names = eastBubble.map((t) => `${t.teamCity} ${t.teamName}`).join('・')
+    themes.push({
+      id: 'east-bubble',
+      title: `東地区プレーイン争いの現状と行方`,
+      prompt:
+        `${date}時点の東地区プレーイントーナメント争いを分析してください。` +
+        `現在7〜10位を争う${names}のそれぞれの強み・弱み・残り試合の有利不利を比較し、` +
+        `プレーオフに進める2チームを予測してください。`,
+    })
+  }
+
+  const westBubble = west.slice(6, 10)
+  if (westBubble.length >= 2) {
+    const names = westBubble.map((t) => `${t.teamCity} ${t.teamName}`).join('・')
+    themes.push({
+      id: 'west-bubble',
+      title: `西地区プレーイン争いの現状と行方`,
+      prompt:
+        `${date}時点の西地区プレーイントーナメント争いを分析してください。` +
+        `現在7〜10位を争う${names}の比較分析と、プレーオフ進出予測を論じてください。`,
+    })
+  }
+
+  return themes.slice(0, 4)
+}
+
 // ─── テーマ選定ロジック ──────────────────────────────────────────────
-function selectThemes(data: NBALatestData): ArticleTheme[] {
+function selectThemes(data: NBALatestData, standings: StandingsData | null): ArticleTheme[] {
   const themes: ArticleTheme[] = []
   const { date, games, topScorers } = data
+
+  // ── ゲームデータがある場合 ───────────────────────────────────────
 
   // a. 最大得点差の試合 → 「粉砕」系
   if (games.length > 0) {
@@ -167,7 +244,19 @@ function selectThemes(data: NBALatestData): ArticleTheme[] {
       `優勝候補の現状と課題を${date}時点の情報をもとに論じてください。`,
   })
 
-  // フォールバック（4テーマ未満の場合）
+  // ── ゲームデータなし → standings フォールバック ──────────────────
+  if (themes.length < 4 && standings) {
+    console.log('  ℹ️  試合データなし → standings.json からテーマを補完します')
+    const standingsFills = standingsThemes(standings, date)
+    for (const t of standingsFills) {
+      if (themes.length >= 4) break
+      if (!themes.some((existing) => existing.id === t.id)) {
+        themes.push(t)
+      }
+    }
+  }
+
+  // ── 汎用フォールバック（standings もない場合）───────────────────
   const fallbacks: ArticleTheme[] = [
     {
       id: 'mvp-race',
@@ -247,15 +336,14 @@ async function generateArticle(
 }
 
 // ─── Main ────────────────────────────────────────────────────────────
-async function main() {
+export async function run() {
   console.log('━'.repeat(50))
   console.log('  記事自動生成')
   console.log('━'.repeat(50))
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    console.error('❌ ANTHROPIC_API_KEY が設定されていません')
-    process.exit(1)
+    throw new Error('ANTHROPIC_API_KEY が設定されていません')
   }
 
   const client = new Anthropic({ apiKey })
@@ -282,8 +370,14 @@ async function main() {
     fs.mkdirSync(DRAFT_DIR, { recursive: true })
   }
 
+  // standings 読み込み（フォールバック用）
+  const standings = loadStandings()
+  if (standings) {
+    console.log(`順位表読み込み: ${standings.season}（東${standings.east.length}・西${standings.west.length}チーム）`)
+  }
+
   // テーマ選定
-  const themes = selectThemes(nbaData)
+  const themes = selectThemes(nbaData, standings)
   console.log(`\nテーマ選定: ${themes.length}件`)
   themes.forEach((t, i) => console.log(`  [${i + 1}] ${t.title}`))
 
@@ -302,7 +396,13 @@ async function main() {
   console.log('━'.repeat(50) + '\n')
 }
 
-main().catch((err) => {
-  console.error('エラー:', err instanceof Error ? err.message : err)
-  process.exit(1)
-})
+const isMain = process.argv[1]
+  ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  : false
+
+if (isMain) {
+  run().catch((err) => {
+    console.error('❌', err instanceof Error ? err.message : err)
+    process.exit(1)
+  })
+}
