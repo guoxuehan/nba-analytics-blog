@@ -3,6 +3,7 @@
  * - articles-draft/ の .md ファイルを一括処理
  * - 品質チェック: 70点以上 → Supabase公開 / 70点未満 → needs-review/ に移動
  * - X投稿文を articles-draft/x-posts/ に保存
+ * - 公開時刻を PUBLISH_INTERVAL_HOURS 時間ずつずらして一括 INSERT
  */
 import * as fs from 'fs'
 import * as path from 'path'
@@ -11,6 +12,8 @@ import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 import { parseDraft } from './_parse-draft'
 import { resolveThumbnail } from './_thumbnail'
+import type { DraftMeta } from './_parse-draft'
+import type { ThumbnailResult } from './_thumbnail'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -105,6 +108,36 @@ function extractXPost(content: string): string | null {
   return match ? match[1].trim() : null
 }
 
+// ─── JST 時刻文字列（HH:MM）──────────────────────────────────────────
+function toJSTTime(date: Date): string {
+  return date.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+// ─── 公開スケジュールのログ表示 ──────────────────────────────────────
+function logSchedule(index: number, publishedAt: Date, intervalHours: number): void {
+  const delayHours = index * intervalHours
+  if (delayHours === 0) {
+    console.log(`   📅 記事${index + 1}: 即時公開`)
+  } else {
+    console.log(
+      `   📅 記事${index + 1}: ${delayHours}時間後に公開（${toJSTTime(publishedAt)} JST）`,
+    )
+  }
+}
+
+// ─── 公開キューのアイテム型 ──────────────────────────────────────────
+type PublishItem = {
+  meta: DraftMeta
+  body: string
+  thumbnail: ThumbnailResult
+  filename: string
+}
+
 // ─── Main ────────────────────────────────────────────────────────────
 export async function run(): Promise<{ published: number; needsReview: number; skipped: number }> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -115,6 +148,11 @@ export async function run(): Promise<{ published: number; needsReview: number; s
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey)
+
+  const intervalHours = Math.max(
+    1,
+    parseInt(process.env.PUBLISH_INTERVAL_HOURS ?? '3', 10),
+  )
 
   if (!fs.existsSync(DRAFT_DIR)) {
     console.log('articles-draft/ が存在しません')
@@ -127,10 +165,7 @@ export async function run(): Promise<{ published: number; needsReview: number; s
   // トップレベルの .md ファイルのみ対象
   const files = fs
     .readdirSync(DRAFT_DIR)
-    .filter(
-      (f) =>
-        f.endsWith('.md') && fs.statSync(path.join(DRAFT_DIR, f)).isFile(),
-    )
+    .filter((f) => f.endsWith('.md') && fs.statSync(path.join(DRAFT_DIR, f)).isFile())
 
   if (files.length === 0) {
     console.log('処理対象の記事がありません')
@@ -138,11 +173,15 @@ export async function run(): Promise<{ published: number; needsReview: number; s
   }
 
   console.log(`\n処理対象: ${files.length}件`)
+  console.log(`公開間隔: ${intervalHours}時間（PUBLISH_INTERVAL_HOURS）`)
   console.log('─'.repeat(60))
 
-  let published = 0
   let needsReview = 0
   let skipped = 0
+  const publishQueue: PublishItem[] = []
+
+  // ─── フェーズ1: スクリーニング ───────────────────────────────────
+  console.log('\n【フェーズ1】品質チェック・スクリーニング')
 
   for (const file of files) {
     const filepath = path.join(DRAFT_DIR, file)
@@ -180,7 +219,8 @@ export async function run(): Promise<{ published: number; needsReview: number; s
 
     // 品質チェック
     const score = computeScore(filepath)
-    const grade = score >= 90 ? 'S' : score >= 80 ? 'A' : score >= 70 ? 'B' : score >= 60 ? 'C' : 'D'
+    const grade =
+      score >= 90 ? 'S' : score >= 80 ? 'A' : score >= 70 ? 'B' : score >= 60 ? 'C' : 'D'
     console.log(`   スコア: ${score}点（${grade}）`)
 
     // X投稿文を保存
@@ -213,41 +253,61 @@ export async function run(): Promise<{ published: number; needsReview: number; s
       continue
     }
 
-    // サムネイル解決
-    process.stdout.write('   サムネイル取得中...')
-    const thumbnail = await resolveThumbnail(meta, meta.slug, supabase)
-    console.log(` ${thumbnail.label}`)
-
-    // Supabase INSERT
-    const now = new Date().toISOString()
-    const { error } = await supabase.from('articles').insert({
-      title: meta.title,
-      slug: meta.slug,
-      category: meta.category,
-      tags: meta.tags,
-      excerpt: meta.excerpt || null,
-      content: body,
-      thumbnail_url: thumbnail.url ?? null,
-      published: true,
-      published_at: now,
-      created_at: now,
-      updated_at: now,
-    })
-
-    if (error) {
-      console.error(`   ❌ 公開失敗: ${error.message}`)
-      if (error.message.includes('row-level security')) {
-        console.error('   → Supabase の articles テーブル INSERT ポリシーを確認してください')
-      }
-      skipped++
-      continue
-    }
-
-    console.log(`   ✅ 公開完了: https://sports-academia.com/articles/${meta.slug}`)
-    published++
+    console.log('   ✅ 公開キューに追加')
+    publishQueue.push({ meta, body, thumbnail: { url: null, source: 'none', label: '' }, filename: file })
   }
 
-  return { published, needsReview, skipped }
+  if (publishQueue.length === 0) {
+    console.log('\n公開対象の記事がありません')
+    return { published: 0, needsReview, skipped }
+  }
+
+  // ─── フェーズ2: サムネイル解決 ──────────────────────────────────
+  console.log(`\n【フェーズ2】サムネイル取得（${publishQueue.length}件）`)
+
+  for (const item of publishQueue) {
+    process.stdout.write(`   ${item.meta.slug} ... `)
+    item.thumbnail = await resolveThumbnail(item.meta, item.meta.slug, supabase)
+    console.log(item.thumbnail.label)
+  }
+
+  // ─── フェーズ3: 公開時刻を割り当てて一括 INSERT ──────────────────
+  console.log(`\n【フェーズ3】公開スケジュール設定・一括 INSERT`)
+
+  const baseTime = new Date()
+  const rows = publishQueue.map((item, index) => {
+    const publishedAt = new Date(baseTime.getTime() + index * intervalHours * 60 * 60 * 1000)
+    logSchedule(index, publishedAt, intervalHours)
+
+    const now = new Date().toISOString()
+    return {
+      title: item.meta.title,
+      slug: item.meta.slug,
+      category: item.meta.category,
+      tags: item.meta.tags,
+      excerpt: item.meta.excerpt || null,
+      content: item.body,
+      thumbnail_url: item.thumbnail.url ?? null,
+      published: true,
+      published_at: publishedAt.toISOString(),
+      created_at: now,
+      updated_at: now,
+    }
+  })
+
+  const { error } = await supabase.from('articles').insert(rows)
+
+  if (error) {
+    console.error(`\n❌ 一括 INSERT 失敗: ${error.message}`)
+    if (error.message.includes('row-level security')) {
+      console.error('   → Supabase の articles テーブル INSERT ポリシーを確認してください')
+    }
+    return { published: 0, needsReview, skipped: skipped + publishQueue.length }
+  }
+
+  console.log(`\n✅ ${rows.length}件を一括 INSERT 完了`)
+
+  return { published: rows.length, needsReview, skipped }
 }
 
 const isMain = process.argv[1]
