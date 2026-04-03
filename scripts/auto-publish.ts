@@ -151,7 +151,7 @@ export async function run(): Promise<{ published: number; needsReview: number; s
 
   const intervalHours = Math.max(
     1,
-    parseInt(process.env.PUBLISH_INTERVAL_HOURS ?? '3', 10),
+    parseInt(process.env.PUBLISH_INTERVAL_HOURS ?? '4', 10),
   )
 
   if (!fs.existsSync(DRAFT_DIR)) {
