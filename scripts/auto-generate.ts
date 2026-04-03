@@ -10,7 +10,7 @@ import * as path from 'path'
 import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import Anthropic from '@anthropic-ai/sdk'
-import type { NBALatestData, NBAStandingTeam } from './fetch-nba-data'
+import type { NBALatestData, NBAStandingTeam, GameLeader, PlayerGameStat } from './fetch-nba-data'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -22,6 +22,7 @@ type ArticleTheme = {
   id: string
   title: string
   prompt: string
+  hasRealData?: boolean  // true の場合「推定値不使用」指示を付与
 }
 
 // ─── プロンプトルール ─────────────────────────────────────────────────
@@ -92,6 +93,39 @@ X投稿文：
 - パターン1【データ訴求型】、パターン2【議論喚起型】、パターン3【ストーリー型】
 - 各280文字以内、#NBA + 関連タグ2〜3個、URLは [URL]
 `.trim()
+
+// ─── 実データ使用指示（ゲームデータあり記事のみ付与）───────────────────
+const REAL_DATA_INSTRUCTION = `
+【データ利用規則・厳守】
+以下のデータは本日取得した最新の実測値です。
+このデータのみを使用し、推定値・予測値は絶対に使わないこと。
+データに含まれない選手のシーズン平均・過去スタッツ等は記載しないこと。
+数字は提供されたものをそのまま使用し、切り捨て・四捨五入・補正をしないこと。
+`.trim()
+
+// ─── 選手スタッツのフォーマット ──────────────────────────────────────
+
+function formatLeaders(
+  leaders: { home: GameLeader[]; away: GameLeader[] } | undefined,
+  homeTeam: string,
+  awayTeam: string,
+): string {
+  if (!leaders) return ''
+
+  function formatSide(side: GameLeader[], teamName: string): string {
+    if (side.length === 0) return ''
+    const parts = side.map((l) => {
+      const statLabel = l.stat === 'pts' ? '得点' : l.stat === 'reb' ? 'リバウンド' : 'アシスト'
+      return `${l.playerName}（${statLabel}${l.value}）`
+    })
+    return `${teamName}: ${parts.join('、')}`
+  }
+
+  const homePart = formatSide(leaders.home, homeTeam)
+  const awayPart = formatSide(leaders.away, awayTeam)
+  const parts = [homePart, awayPart].filter(Boolean)
+  return parts.length > 0 ? `\n主要選手スタッツ: ${parts.join(' / ')}` : ''
+}
 
 // ─── standings.json の読み込み ────────────────────────────────────────
 type StandingsData = {
@@ -168,7 +202,11 @@ function standingsThemes(standings: StandingsData, date: string): ArticleTheme[]
 }
 
 // ─── テーマ選定ロジック ──────────────────────────────────────────────
-function selectThemes(data: NBALatestData, standings: StandingsData | null): ArticleTheme[] {
+function selectThemes(
+  data: NBALatestData,
+  standings: StandingsData | null,
+  _playerStats: PlayerGameStat[],
+): ArticleTheme[] {
   const themes: ArticleTheme[] = []
   const { date, games, topScorers } = data
 
@@ -178,24 +216,29 @@ function selectThemes(data: NBALatestData, standings: StandingsData | null): Art
   if (games.length > 0) {
     const bigWin = games.reduce((prev, cur) => (cur.scoreDiff > prev.scoreDiff ? cur : prev))
     const loser = bigWin.homeTeam === bigWin.winner ? bigWin.awayTeam : bigWin.homeTeam
+    const leadersText = formatLeaders(bigWin.leaders, bigWin.homeTeam, bigWin.awayTeam)
 
     if (bigWin.scoreDiff >= 15) {
       themes.push({
         id: 'blowout',
         title: `${bigWin.winner}が${loser}を粉砕`,
+        hasRealData: true,
         prompt:
           `${date}のNBA試合で、${bigWin.winner}が${loser}を` +
           `${bigWin.homeScore}-${bigWin.awayScore}（${bigWin.scoreDiff}点差）で粉砕しました。` +
-          `この大差勝利の要因を戦術・スタッツ・チーム状況から分析してください。`,
+          leadersText +
+          `\nこの大差勝利の要因を戦術・スタッツ・チーム状況から分析してください。`,
       })
     } else {
       themes.push({
         id: 'blowout',
         title: `${bigWin.winner}の勝利分析`,
+        hasRealData: true,
         prompt:
           `${date}のNBA試合で、${bigWin.winner}が${loser}に` +
           `${bigWin.homeScore}-${bigWin.awayScore}で勝利しました。` +
-          `勝利の要因と今後の展望を分析してください。`,
+          leadersText +
+          `\n勝利の要因と今後の展望を分析してください。`,
       })
     }
   }
@@ -203,13 +246,20 @@ function selectThemes(data: NBALatestData, standings: StandingsData | null): Art
   // b. 最高個人得点 → 選手分析
   if (topScorers.length > 0) {
     const mvp = topScorers[0]
+    // 同試合の全リーダーを取得
+    const mvpGame = games.find((g) => g.id === mvp.gameId)
+    const leadersText = mvpGame
+      ? formatLeaders(mvpGame.leaders, mvpGame.homeTeam, mvpGame.awayTeam)
+      : ''
     themes.push({
       id: 'top-scorer',
       title: `${mvp.playerName}の${mvp.pts}得点分析`,
+      hasRealData: true,
       prompt:
         `${date}のNBA試合で、${mvp.team}の${mvp.playerName}が` +
-        `${mvp.pts}得点・${mvp.reb}リバウンド・${mvp.ast}アシストを記録しました。` +
-        `このパフォーマンスをスタッツ・プレースタイル・チームへの貢献度・今シーズンの文脈を含めて徹底分析してください。`,
+        `${mvp.pts}得点${mvp.reb > 0 ? `・${mvp.reb}リバウンド` : ''}${mvp.ast > 0 ? `・${mvp.ast}アシスト` : ''}を記録しました。` +
+        leadersText +
+        `\nこのパフォーマンスをスタッツ・プレースタイル・チームへの貢献度・今シーズンの文脈を含めて徹底分析してください。`,
     })
   }
 
@@ -218,23 +268,29 @@ function selectThemes(data: NBALatestData, standings: StandingsData | null): Art
   if (closeGames.length > 0) {
     const closest = closeGames.reduce((prev, cur) => (cur.scoreDiff < prev.scoreDiff ? cur : prev))
     const loser = closest.homeTeam === closest.winner ? closest.awayTeam : closest.homeTeam
+    const leadersText = formatLeaders(closest.leaders, closest.homeTeam, closest.awayTeam)
     themes.push({
       id: 'close-game',
       title: `${closest.winner}が${closest.homeScore}-${closest.awayScore}接戦制す`,
+      hasRealData: true,
       prompt:
         `${date}のNBA試合で、${closest.winner}が${loser}を` +
         `${closest.homeScore}-${closest.awayScore}の接戦で下しました。` +
-        `接戦を勝ち切った要因、クラッチタイムの戦術、勝負を決めた局面を分析してください。`,
+        leadersText +
+        `\n接戦を勝ち切った要因、クラッチタイムの戦術、勝負を決めた局面を分析してください。`,
     })
   } else if (games.length > 1) {
     const g = games[1]
     const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
+    const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     themes.push({
       id: 'close-game',
       title: `${g.winner}対${loser} 試合分析`,
+      hasRealData: true,
       prompt:
         `${date}のNBA試合、${g.winner}対${loser}（${g.homeScore}-${g.awayScore}）を分析してください。` +
-        `試合の流れ、両チームの戦術、勝敗を分けたポイントを論じてください。`,
+        leadersText +
+        `\n試合の流れ、両チームの戦術、勝敗を分けたポイントを論じてください。`,
     })
   }
 
@@ -296,13 +352,17 @@ async function generateArticle(
   try {
     let content = ''
 
+    const dataInstruction = theme.hasRealData
+      ? `\n\n${REAL_DATA_INSTRUCTION}\n\n---\n\n`
+      : '\n\n---\n\n'
+
     const stream = client.messages.stream({
       model: MODEL,
       max_tokens: 4096,
       messages: [
         {
           role: 'user',
-          content: `${ARTICLE_RULES}\n\n---\n\n${theme.prompt}`,
+          content: `${ARTICLE_RULES}${dataInstruction}${theme.prompt}`,
         },
       ],
     })
@@ -367,6 +427,7 @@ export async function run() {
       gamesCount: 0,
       games: [],
       topScorers: [],
+      dataSource: 'none',
     }
   }
 
@@ -380,8 +441,20 @@ export async function run() {
     console.log(`順位表読み込み: ${standings.season}（東${standings.east.length}・西${standings.west.length}チーム）`)
   }
 
+  // player-stats.json 読み込み
+  const playerStatsPath = path.join(DATA_DIR, 'player-stats.json')
+  let playerStats: PlayerGameStat[] = []
+  if (fs.existsSync(playerStatsPath)) {
+    try {
+      playerStats = JSON.parse(fs.readFileSync(playerStatsPath, 'utf-8')) as PlayerGameStat[]
+      console.log(`選手スタッツ読み込み: ${playerStats.length}試合分`)
+    } catch {
+      console.warn('⚠️  player-stats.json の読み込み失敗')
+    }
+  }
+
   // テーマ選定
-  const themes = selectThemes(nbaData, standings)
+  const themes = selectThemes(nbaData, standings, playerStats)
   console.log(`\nテーマ選定: ${themes.length}件`)
   themes.forEach((t, i) => console.log(`  [${i + 1}] ${t.title}`))
 
