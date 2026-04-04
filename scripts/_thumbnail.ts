@@ -1,16 +1,19 @@
 /**
  * サムネイル自動解決モジュール
- * 優先1: thumbnails/ ローカル画像マッチング
- * 優先2: Unsplash API で取得
+ * 優先1: thumbnails/ ローカル画像マッチング → public/images/thumbnails/ に保存
+ * 優先2: Unsplash API で取得 → public/images/thumbnails/ に保存
  * 優先3: なし
+ *
+ * 保存先: public/images/thumbnails/{slug}.jpg
+ * 配信URL: /images/thumbnails/{slug}.jpg（Vercel CDN経由）
  */
 import * as fs from 'fs'
 import * as path from 'path'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DraftMeta } from './_parse-draft'
 import { optimizeImage } from '../lib/image-optimizer'
 
-const THUMBNAILS_DIR = path.resolve(process.cwd(), 'thumbnails')
+const THUMBNAILS_SRC_DIR = path.resolve(process.cwd(), 'thumbnails')
+const THUMBNAILS_OUT_DIR = path.resolve(process.cwd(), 'public/images/thumbnails')
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
 
 // ── カタカナ → 英語マッピング ────────────────────────────────────
@@ -68,7 +71,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 export type ThumbnailResult = {
   url: string | null
   source: 'local' | 'unsplash' | 'none'
-  label: string  // ターミナル表示用
+  label: string
 }
 
 // ── キーワード抽出 ──────────────────────────────────────────────
@@ -97,10 +100,10 @@ function scoreFilename(filename: string, keywords: string[]): number {
 }
 
 function matchLocal(keywords: string[]): { filepath: string; filename: string } | null {
-  if (!fs.existsSync(THUMBNAILS_DIR)) return null
+  if (!fs.existsSync(THUMBNAILS_SRC_DIR)) return null
 
   const files = fs
-    .readdirSync(THUMBNAILS_DIR)
+    .readdirSync(THUMBNAILS_SRC_DIR)
     .filter((f) => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
 
   if (files.length === 0) return null
@@ -111,48 +114,43 @@ function matchLocal(keywords: string[]): { filepath: string; filename: string } 
 
   const best = scored.filter((s) => s.score === maxScore)
   const chosen = best[Math.floor(Math.random() * best.length)]
-  return { filepath: path.join(THUMBNAILS_DIR, chosen.f), filename: chosen.f }
+  return { filepath: path.join(THUMBNAILS_SRC_DIR, chosen.f), filename: chosen.f }
 }
 
-// ── Supabase Storage アップロード ───────────────────────────────
-async function uploadBuffer(
-  buffer: Buffer | ArrayBuffer,
-  storageKey: string,
-  contentType: string,
-  supabase: SupabaseClient,
-): Promise<string | null> {
-  const { error } = await supabase.storage
-    .from('post-images')
-    .upload(storageKey, buffer, { contentType, upsert: true })
+// ── public/images/thumbnails/ への保存 ─────────────────────────
 
-  if (error) return null
-
-  const { data } = supabase.storage.from('post-images').getPublicUrl(storageKey)
-  return data.publicUrl
+function ensureOutputDir(): void {
+  if (!fs.existsSync(THUMBNAILS_OUT_DIR)) {
+    fs.mkdirSync(THUMBNAILS_OUT_DIR, { recursive: true })
+  }
 }
 
-async function uploadLocalFile(
-  filepath: string,
-  slug: string,
-  supabase: SupabaseClient,
-): Promise<string | null> {
-  const raw = fs.readFileSync(filepath)
-  const optimized = await optimizeImage(raw)
-  const storageKey = `articles/${slug}-thumbnail.jpg`
-  return uploadBuffer(optimized, storageKey, 'image/jpeg', supabase)
+async function saveLocalFile(filepath: string, slug: string): Promise<string | null> {
+  try {
+    ensureOutputDir()
+    const raw = fs.readFileSync(filepath)
+    const optimized = await optimizeImage(raw)
+    const outPath = path.join(THUMBNAILS_OUT_DIR, `${slug}.jpg`)
+    fs.writeFileSync(outPath, optimized)
+    return `/images/thumbnails/${slug}.jpg`
+  } catch {
+    return null
+  }
 }
 
-async function uploadFromUrl(
-  imageUrl: string,
-  slug: string,
-  supabase: SupabaseClient,
-): Promise<string | null> {
-  const res = await fetch(imageUrl)
-  if (!res.ok) return null
-  const raw = await res.arrayBuffer()
-  const optimized = await optimizeImage(raw)
-  const storageKey = `articles/${slug}-thumbnail.jpg`
-  return uploadBuffer(optimized, storageKey, 'image/jpeg', supabase)
+async function saveFromUrl(imageUrl: string, slug: string): Promise<string | null> {
+  try {
+    const res = await fetch(imageUrl)
+    if (!res.ok) return null
+    const raw = await res.arrayBuffer()
+    ensureOutputDir()
+    const optimized = await optimizeImage(raw)
+    const outPath = path.join(THUMBNAILS_OUT_DIR, `${slug}.jpg`)
+    fs.writeFileSync(outPath, optimized)
+    return `/images/thumbnails/${slug}.jpg`
+  } catch {
+    return null
+  }
 }
 
 // ── Unsplash API ────────────────────────────────────────────────
@@ -184,14 +182,23 @@ async function fetchUnsplashImageUrl(keywords: string[]): Promise<string | null>
 export async function resolveThumbnail(
   meta: DraftMeta,
   slug: string,
-  supabase: SupabaseClient,
 ): Promise<ThumbnailResult> {
   const keywords = extractKeywords(meta)
+
+  // 出力先に同名ファイルがすでに存在すればスキップ
+  const existingPath = path.join(THUMBNAILS_OUT_DIR, `${slug}.jpg`)
+  if (fs.existsSync(existingPath)) {
+    return {
+      url: `/images/thumbnails/${slug}.jpg`,
+      source: 'local',
+      label: `${slug}.jpg（キャッシュ済み）`,
+    }
+  }
 
   // 優先1: ローカル thumbnails/ マッチング
   const local = matchLocal(keywords)
   if (local) {
-    const url = await uploadLocalFile(local.filepath, slug, supabase)
+    const url = await saveLocalFile(local.filepath, slug)
     if (url) {
       return { url, source: 'local', label: `${local.filename}（ローカル）` }
     }
@@ -200,7 +207,7 @@ export async function resolveThumbnail(
   // 優先2: Unsplash API
   const unsplashUrl = await fetchUnsplashImageUrl(keywords)
   if (unsplashUrl) {
-    const url = await uploadFromUrl(unsplashUrl, slug, supabase)
+    const url = await saveFromUrl(unsplashUrl, slug)
     if (url) {
       return { url, source: 'unsplash', label: 'Unsplashから取得' }
     }

@@ -126,7 +126,7 @@ async function main() {
 
   // ── サムネイル解決 ───────────────────────────────────────────
   process.stdout.write('サムネイルを取得中...')
-  const thumbnail = await resolveThumbnail(meta, meta.slug, supabase)
+  const thumbnail = await resolveThumbnail(meta, meta.slug)
   console.log(` サムネイル: ${thumbnail.label}`)
 
   // ── 内容確認 ─────────────────────────────────────────────────

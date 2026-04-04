@@ -14,6 +14,7 @@ import { parseDraft } from './_parse-draft'
 import { resolveThumbnail } from './_thumbnail'
 import type { DraftMeta } from './_parse-draft'
 import type { ThumbnailResult } from './_thumbnail'
+// サムネイルはpublic/images/thumbnails/に保存（Supabase Storageを使わない）
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -267,7 +268,7 @@ export async function run(): Promise<{ published: number; needsReview: number; s
 
   for (const item of publishQueue) {
     process.stdout.write(`   ${item.meta.slug} ... `)
-    item.thumbnail = await resolveThumbnail(item.meta, item.meta.slug, supabase)
+    item.thumbnail = await resolveThumbnail(item.meta, item.meta.slug)
     console.log(item.thumbnail.label)
   }
 

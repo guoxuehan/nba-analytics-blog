@@ -17,7 +17,8 @@
     "pipeline": "tsx scripts/daily-pipeline.ts",
     "pipeline:fetch": "tsx scripts/fetch-nba-data.ts",
     "pipeline:generate": "tsx scripts/auto-generate.ts",
-    "pipeline:publish": "tsx scripts/auto-publish.ts"
+    "pipeline:publish": "tsx scripts/auto-publish.ts",
+    "migrate:images": "tsx scripts/migrate-images.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
