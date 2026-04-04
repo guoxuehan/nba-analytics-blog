@@ -1,14 +1,11 @@
-import * as fs from 'fs'
-import * as path from 'path'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { verifyAdminRequest } from '@/lib/admin-auth'
 import { optimizeImage } from '@/lib/image-optimizer'
 
-// 保存先: public/images/thumbnails/
-// 配信URL: /images/thumbnails/{filename}（Vercel CDN経由）
-// 注意: Vercel本番環境ではファイルシステムに書き込めないため、
-//       このエンドポイントはローカル開発環境専用です。
-//       本番への反映はgit commit + pushが必要です。
-const THUMBNAILS_DIR = path.join(process.cwd(), 'public', 'images', 'thumbnails')
+// 管理画面からのアップロードはSupabase Storageに保存
+// （Vercel本番ではファイルシステムに書き込めないため）
+// 自動パイプライン（GitHub Actions）はpublic/images/thumbnails/に保存
+const BUCKET = 'post-images'
 
 export async function POST(request: Request) {
   const isAdmin = await verifyAdminRequest(request)
@@ -28,24 +25,26 @@ export async function POST(request: Request) {
     return Response.json({ error: '画像ファイルが必要です' }, { status: 400 })
   }
 
-  const baseName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
-  const filePath = path.join(THUMBNAILS_DIR, baseName)
+  const fileName = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
 
   const raw = await file.arrayBuffer()
   const optimized = await optimizeImage(raw)
+  const supabaseAdmin = getSupabaseAdmin()
 
-  try {
-    if (!fs.existsSync(THUMBNAILS_DIR)) {
-      fs.mkdirSync(THUMBNAILS_DIR, { recursive: true })
-    }
-    fs.writeFileSync(filePath, optimized)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return Response.json(
-      { error: `ファイル保存に失敗しました: ${msg}（Vercel本番では使用不可）` },
-      { status: 500 },
-    )
+  const { error } = await supabaseAdmin.storage
+    .from(BUCKET)
+    .upload(fileName, optimized, {
+      contentType: 'image/jpeg',
+      upsert: false,
+    })
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 })
   }
 
-  return Response.json({ url: `/images/thumbnails/${baseName}` })
+  const { data: { publicUrl } } = supabaseAdmin.storage
+    .from(BUCKET)
+    .getPublicUrl(fileName)
+
+  return Response.json({ url: publicUrl })
 }
