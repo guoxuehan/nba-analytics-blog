@@ -85,6 +85,16 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
 
   const now = new Date().toISOString()
 
+  // 管理画面から published=true で保存する場合:
+  // - published_at が未来またはnull → now に上書き（即時公開）
+  // - published_at が過去 → そのまま保持（既公開記事の編集）
+  // これにより .lte('published_at', now) フィルタをすり抜けず確実に表示される
+  const resolvedPublishedAt = (() => {
+    if (!data.published) return data.published_at ?? null
+    if (!data.published_at) return now
+    return new Date(data.published_at) <= new Date() ? data.published_at : now
+  })()
+
   const payload = {
     title: data.title,
     slug: data.slug,
@@ -94,10 +104,7 @@ export async function saveArticleAction(data: ArticleFormData): Promise<SaveResu
     tags: data.tags,
     thumbnail_url: data.thumbnail_url || null,
     published: data.published,
-    // 新規公開時のみ published_at をセット、既存は保持
-    published_at: data.published
-      ? data.published_at ?? now
-      : (data.published_at ?? null),
+    published_at: resolvedPublishedAt,
     updated_at: now,
   }
 
