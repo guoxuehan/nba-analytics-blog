@@ -1,7 +1,7 @@
 /**
  * 記事自動生成スクリプト
  * - data/nba-latest.json を読み込み
- * - 3テーマを自動選定（試合レビュー・日本人注目・ニッチデータ）
+ * - 3テーマを自動選定（ドラマ型・論争型・カルチャー型）
  * - Claude APIで記事を生成
  * - articles-draft/ に保存
  */
@@ -29,8 +29,25 @@ type ArticleTheme = {
 
 // ─── プロンプトルール ─────────────────────────────────────────────────
 const ARTICLE_RULES = `
-あなたはNBA分析メディア「NBA COURT VISION」のAI編集アシスタントです。
-戦略コンサルタント兼PhDデータサイエンティストの視点で記事を作成してください。
+あなたはESPNやThe Ringerのベテランコラムニストだ。
+試合結果を要約するレポーターではない。
+
+記事は以下のルールで書け：
+1. リード文で読者の感情を動かせ。驚き、怒り、笑い、疑問のいずれか
+2. データは「主張を支える証拠」として使え。データの羅列ではない
+3. 必ず1つの「問い」を立てろ。答えのない問いでもいい
+4. 選手やコーチの発言を1つ以上引用しろ（データから推測するな、取得したデータに含まれる場合のみ）
+5. 読者が誰かに話したくなる「1つの事実」を入れろ
+6. 最後に読者に問いかけて終われ
+
+やってはいけないこと：
+- 試合結果の時系列での説明
+- 「第1Qは○○、第2Qは△△」のようなクォーター別の記述
+- スタッツの一覧表示
+- 「素晴らしい活躍を見せた」のような空虚な褒め言葉
+- 結論で記事全体を要約すること
+
+─────────────────────────────────────────────────────────
 
 出力フォーマット（必ずこの順番・形式で出力すること）：
 ---METADATA---
@@ -76,15 +93,14 @@ excerpt: （100〜150文字の抜粋）
 - 問いかけは短く鋭く
 - リード文は事実・数字・場面からいきなり入れ
 - 見出しは数字・固有名詞・動詞を含む具体的なものに
-- まとめは要約するな、新しい視点を1つ残せ
 
-記事構成：
-1. リード文（3〜4文）
-2. h2：データ分析セクション1
-3. h2：データ分析セクション2
-4. h2：考察・深掘り
-5. h2：筆者の視点（戦略コンサル×データサイエンティストとして1〜2段落）
-6. h2：まとめ
+記事構成（見出し名は自由に付けること。「セクション1」のような仮名は禁止）：
+1. リード文（3〜4文）──感情を動かす入り方
+2. h2：このゲーム・テーマの本質的な「問い」
+3. h2：主張を裏付けるデータと文脈
+4. h2：逆説・反論・別の見方
+5. h2：筆者の視点（コラムニストとして断言する1〜2段落）
+6. h2：読者への問いかけで締める
 
 タグのルール：
 - 選手名はカタカナ「名・姓」（例：バム・アデバヨ）
@@ -210,79 +226,123 @@ function loadStandings(): StandingsData | null {
   }
 }
 
-// ─── テーマ1: 昨夜のゲームレビュー ──────────────────────────────────
+// ─── テーマ1: ドラマ型（昨夜の試合から「物語」を探す）────────────────
 
-function buildGameReviewTheme(games: GameSummary[], date: string): ArticleTheme | null {
+function buildDramaTheme(games: GameSummary[], date: string): ArticleTheme | null {
   if (games.length === 0) return null
 
-  // 優先b: 接戦（5点差以内）
+  // 全試合の最高得点を収集
+  type ScoringHero = { player: string; pts: number; game: GameSummary }
+  const heroes: ScoringHero[] = []
+  for (const g of games) {
+    for (const side of ['home', 'away'] as const) {
+      const leaders = g.leaders?.[side] ?? []
+      const ptsLeader = leaders.find((l) => l.stat === 'pts')
+      if (ptsLeader) heroes.push({ player: ptsLeader.playerName, pts: ptsLeader.value, game: g })
+    }
+  }
+  heroes.sort((a, b) => b.pts - a.pts)
+
+  // 優先a: 個人のマイルストーン候補（38点以上 = キャリアハイ水準）
+  const milestoneHero = heroes.find((h) => h.pts >= 38)
+  if (milestoneHero) {
+    const g = milestoneHero.game
+    const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
+    const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
+    return {
+      id: 'drama',
+      title: `${milestoneHero.player} ${milestoneHero.pts}点の夜`,
+      hasRealData: true,
+      prompt:
+        `${date}のNBA、${g.winner} vs ${loser}（${g.homeScore}-${g.awayScore}）。` +
+        `${milestoneHero.player}が${milestoneHero.pts}得点を記録しました。` +
+        leadersText +
+        `\n\nこの数字の「意味」を書け。` +
+        `単なるキャリアハイの報告ではなく、この選手がこの夜にたどり着くまでの文脈、` +
+        `この得点がNBAの歴史の中でどこに位置づけられるのか、` +
+        `そしてこれが「始まり」なのか「頂点」なのかを論じてください。`,
+    }
+  }
+
+  // 優先b: 大逆転の可能性（アウェイチームが10点差以上で勝利 = 下馬評覆し）
+  const bigAwayWin = games
+    .filter((g) => g.winner === g.awayTeam && g.scoreDiff >= 10)
+    .sort((a, b) => b.scoreDiff - a.scoreDiff)[0]
+  if (bigAwayWin) {
+    const leadersText = formatLeaders(bigAwayWin.leaders, bigAwayWin.homeTeam, bigAwayWin.awayTeam)
+    return {
+      id: 'drama',
+      title: `${bigAwayWin.winner}がアウェイで${bigAwayWin.scoreDiff}点差の勝利`,
+      hasRealData: true,
+      prompt:
+        `${date}のNBA、アウェイの${bigAwayWin.winner}がホームの${bigAwayWin.homeTeam}を` +
+        `${bigAwayWin.awayScore}-${bigAwayWin.homeScore}（${bigAwayWin.scoreDiff}点差）で下しました。` +
+        leadersText +
+        `\n\nこの試合の「ドラマ」を書け。` +
+        `ホームアドバンテージが機能しなかった理由、アウェイチームが何を持っていたのか、` +
+        `この勝利が両チームにとってシーズンの文脈でどんな意味を持つのかを論じてください。`,
+    }
+  }
+
+  // 優先d: 異常スタッツ（35点以上）
+  const topHero = heroes[0]
+  if (topHero && topHero.pts >= 35) {
+    const g = topHero.game
+    const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
+    const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
+    return {
+      id: 'drama',
+      title: `${topHero.player}の${topHero.pts}点`,
+      hasRealData: true,
+      prompt:
+        `${date}のNBA、${g.winner} vs ${loser}（${g.homeScore}-${g.awayScore}）。` +
+        `${topHero.player}が${topHero.pts}得点を記録しました。` +
+        leadersText +
+        `\n\nこの夜の「異常さ」を書け。` +
+        `この数字が何を意味し、このパフォーマンスがどれほど稀なものかを、` +
+        `読者が思わず誰かに話したくなるような1つの切り口で論じてください。`,
+    }
+  }
+
+  // フォールバック: 接戦のドラマ
   const closeGames = games.filter((g) => g.scoreDiff <= 5).sort((a, b) => a.scoreDiff - b.scoreDiff)
   if (closeGames.length > 0) {
     const g = closeGames[0]
     const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
     const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     return {
-      id: 'game-review',
-      title: `${g.winner}が${g.homeScore}-${g.awayScore}接戦制す`,
+      id: 'drama',
+      title: `${g.winner}が${g.homeScore}-${g.awayScore}の死闘を制す`,
       hasRealData: true,
       prompt:
-        `${date}のNBA試合で、${g.winner}が${loser}を${g.homeScore}-${g.awayScore}（${g.scoreDiff}点差）の接戦で下しました。` +
+        `${date}のNBA、${g.winner}が${loser}を${g.homeScore}-${g.awayScore}（${g.scoreDiff}点差）で下しました。` +
         leadersText +
-        `\n接戦を勝ち切った要因、クラッチタイムの戦術、勝負を決めたプレーを分析してください。` +
-        `逆転があった場合は流れが変わったポイントを重点的に論じてください。`,
+        `\n\nこの試合の「緊張の中身」を書け。` +
+        `点差ではなく、勝者と敗者を分けた1つの決断・1つのプレー・1人の判断を特定し、` +
+        `それがなぜ起きたのかを論じてください。`,
     }
   }
 
-  // 優先c: 最高個人スタッツ（30点以上）
-  let topPtsGame: GameSummary | null = null
-  let topPts = 0
-  let topPlayerName = ''
-  for (const g of games) {
-    const allLeaders = [...(g.leaders?.home ?? []), ...(g.leaders?.away ?? [])]
-    for (const l of allLeaders) {
-      if (l.stat === 'pts' && l.value > topPts) {
-        topPts = l.value
-        topPtsGame = g
-        topPlayerName = l.playerName
-      }
-    }
-  }
-  if (topPtsGame && topPts >= 30) {
-    const g = topPtsGame
-    const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
-    const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
-    return {
-      id: 'game-review',
-      title: `${topPlayerName}の${topPts}得点が光る${g.winner}勝利`,
-      hasRealData: true,
-      prompt:
-        `${date}のNBA試合で、${g.winner}が${loser}を${g.homeScore}-${g.awayScore}で下しました。` +
-        leadersText +
-        `\n${topPlayerName}の${topPts}得点を中心に、勝利の要因をスタッツと戦術の両面から分析してください。`,
-    }
-  }
-
-  // 優先d: 最大得点差（フォールバック）
+  // 最終フォールバック: 最も印象的な試合
   const bigWin = games.reduce((prev, cur) => (cur.scoreDiff > prev.scoreDiff ? cur : prev))
   const loser = bigWin.homeTeam === bigWin.winner ? bigWin.awayTeam : bigWin.homeTeam
   const leadersText = formatLeaders(bigWin.leaders, bigWin.homeTeam, bigWin.awayTeam)
   return {
-    id: 'game-review',
-    title:
-      bigWin.scoreDiff >= 15
-        ? `${bigWin.winner}が${loser}を${bigWin.scoreDiff}点差で圧倒`
-        : `${bigWin.winner}が${loser}に勝利`,
+    id: 'drama',
+    title: `${bigWin.winner}が${loser}を圧倒した夜`,
     hasRealData: true,
     prompt:
-      `${date}のNBA試合で、${bigWin.winner}が${loser}を${bigWin.homeScore}-${bigWin.awayScore}（${bigWin.scoreDiff}点差）で下しました。` +
+      `${date}のNBA、${bigWin.winner}が${loser}を${bigWin.homeScore}-${bigWin.awayScore}（${bigWin.scoreDiff}点差）で下しました。` +
       leadersText +
-      `\n${bigWin.scoreDiff >= 15 ? 'この大差勝利の要因を戦術・スタッツ・チーム状況から分析してください。' : '試合の流れ、両チームの戦術、勝敗を分けたポイントを論じてください。'}`,
+      `\n\nこの勝利の「本質」を書け。` +
+      `スコアの背後に何があったのか、この試合が両チームのシーズンにどんな意味を持つのかを、` +
+      `コラムニストの視点から論じてください。`,
   }
 }
 
-// ─── テーマ2: 日本人読者注目チーム・選手 ────────────────────────────
+// ─── テーマ2: 論争型（日本人注目チーム・選手への「問い」）────────────
 
-function buildJapanInterestTheme(
+function buildDebateTheme(
   data: NBALatestData,
   standings: StandingsData | null,
   recentArticles: RecentArticle[],
@@ -291,11 +351,12 @@ function buildJapanInterestTheme(
   const { games } = data
 
   type Candidate = {
-    game: GameSummary
+    game: GameSummary | null
     team: string
     teamAbbr: string
     priority: number
     playerFocus?: string
+    debateAngle: string
   }
   const candidates: Candidate[] = []
 
@@ -310,7 +371,6 @@ function buildJapanInterestTheme(
         let priority = teamDef.priority
         let playerFocus: string | undefined
 
-        // 注目選手がリーダーにいればボーナス
         const leaders = game.leaders?.[side] ?? []
         for (const player of JAPAN_INTEREST_PLAYERS) {
           if (leaders.some((l) => l.playerName.includes(player.en))) {
@@ -319,12 +379,21 @@ function buildJapanInterestTheme(
             break
           }
         }
-        candidates.push({ game, team: teamName, teamAbbr: abbr, priority, playerFocus })
+
+        // 論争の切り口を自動生成
+        const won = game.winner === teamName
+        const debateAngle = playerFocus
+          ? `${playerFocus}は今季MVP候補に入るべきか？昨夜の${game.homeScore}-${game.awayScore}というスコアを起点に論じてください。`
+          : won
+          ? `${teamName}は本当に優勝候補か？昨夜の勝利で強さを見せたが、プレーオフで崩れる可能性を含めて論じてください。`
+          : `${teamName}はこのまま沈むのか？昨夜の${game.homeScore}-${game.awayScore}の敗北が示すチームの本質的な問題を論じてください。`
+
+        candidates.push({ game, team: teamName, teamAbbr: abbr, priority, playerFocus, debateAngle })
       }
     }
 
-    // 注目チームがいなくても注目選手がいたらチェック
-    if (!candidates.some((c) => c.game.id === game.id)) {
+    // 注目チームがなくても注目選手がいれば拾う
+    if (!candidates.some((c) => c.game?.id === game.id)) {
       for (const side of ['home', 'away'] as const) {
         const leaders = game.leaders?.[side] ?? []
         for (const player of JAPAN_INTEREST_PLAYERS) {
@@ -333,7 +402,14 @@ function buildJapanInterestTheme(
           if (wasRecentlyCovered([player.ja, player.en], recentArticles, 3)) continue
           const team = side === 'home' ? game.homeTeam : game.awayTeam
           const teamAbbr = side === 'home' ? game.homeTeamAbbr : game.awayTeamAbbr
-          candidates.push({ game, team, teamAbbr, priority: 2, playerFocus: player.ja })
+          candidates.push({
+            game,
+            team,
+            teamAbbr,
+            priority: 2,
+            playerFocus: player.ja,
+            debateAngle: `${player.ja}は今何者か？昨夜の${game.homeScore}-${game.awayScore}を踏まえ、この選手の現在地と可能性を論争的な視点で論じてください。`,
+          })
           break
         }
       }
@@ -343,34 +419,33 @@ function buildJapanInterestTheme(
   if (candidates.length > 0) {
     candidates.sort((a, b) => b.priority - a.priority)
     const best = candidates[0]
-    const loser = best.game.homeTeam === best.game.winner ? best.game.awayTeam : best.game.homeTeam
-    const leadersText = formatLeaders(best.game.leaders, best.game.homeTeam, best.game.awayTeam)
+    const loser = best.game
+      ? (best.game.homeTeam === best.game.winner ? best.game.awayTeam : best.game.homeTeam)
+      : ''
+    const leadersText = best.game
+      ? formatLeaders(best.game.leaders, best.game.homeTeam, best.game.awayTeam)
+      : ''
 
-    if (best.playerFocus) {
-      return {
-        id: `japan-interest-${best.teamAbbr.toLowerCase()}`,
-        title: `${best.playerFocus}と${best.team}の試合分析`,
-        hasRealData: true,
-        prompt:
-          `${date}のNBA試合で、${best.game.winner}が${loser}を${best.game.homeScore}-${best.game.awayScore}で下しました。` +
-          leadersText +
-          `\n${best.playerFocus}のパフォーマンスと${best.team}の現状を分析してください。` +
-          `日本のNBAファンが最も注目するチーム・選手として、チームの戦術・今後の展望を論じてください。`,
-      }
-    }
+    const matchContext = best.game
+      ? `${date}のNBA、${best.game.winner}が${loser}を${best.game.homeScore}-${best.game.awayScore}で下しました。${leadersText}\n\n`
+      : `${date}時点のNBAシーズン。\n\n`
+
     return {
-      id: `japan-interest-${best.teamAbbr.toLowerCase()}`,
-      title: `${best.team} ${best.game.homeScore}-${best.game.awayScore} 試合分析`,
-      hasRealData: true,
+      id: `debate-${best.teamAbbr.toLowerCase()}`,
+      title: best.playerFocus
+        ? `${best.playerFocus}論争──今、問われていること`
+        : `${best.team}への問い──このチームは本物か`,
+      hasRealData: !!best.game,
       prompt:
-        `${date}のNBA試合で、${best.game.winner}が${loser}を${best.game.homeScore}-${best.game.awayScore}で下しました。` +
-        leadersText +
-        `\n${best.team}の最新動向、キープレーヤーのパフォーマンス、チームの現状と課題を分析してください。` +
-        `日本のNBAファンが注目するチームとして、プレーオフ争いの観点から今後の展望も論じてください。`,
+        matchContext +
+        `${best.debateAngle}\n\n` +
+        `記事は「議論」として書け。一方的な賞賛でも批判でもない。` +
+        `賛成派と反対派の両方の論拠を示し、最後にコラムニストとして自分の立場を明確にしてください。` +
+        `日本のNBAファンが「わかる、この問いは重要だ」と感じる切り口で。`,
     }
   }
 
-  // 昨夜の試合に注目チームがない → 順位表から最新動向
+  // 昨夜の試合に注目チームがない → 順位表から論争ネタを生成
   if (standings) {
     const sortedTeams = [...JAPAN_INTEREST_TEAMS].sort((a, b) => b.priority - a.priority)
     for (const teamDef of sortedTeams) {
@@ -379,13 +454,15 @@ function buildJapanInterestTheme(
       const standTeam = allTeams.find((t) => t.teamId === teamDef.abbr)
       if (!standTeam) continue
       const conf = standTeam.conference === 'East' ? '東' : '西'
+      const winPctStr = (standTeam.winPct * 100).toFixed(1)
       return {
-        id: `japan-interest-${teamDef.abbr.toLowerCase()}`,
-        title: `${teamDef.ja}最新動向と${conf}地区${standTeam.rank}位の実力`,
+        id: `debate-${teamDef.abbr.toLowerCase()}`,
+        title: `${teamDef.ja}は優勝できるか──勝率${winPctStr}%が語ること`,
         prompt:
-          `${date}時点、${standTeam.teamCity} ${standTeam.teamName}は${standTeam.wins}勝${standTeam.losses}敗（勝率${(standTeam.winPct * 100).toFixed(1)}%）で${conf}地区${standTeam.rank}位です。` +
-          `\nこのチームの最新動向、キープレーヤーのパフォーマンス、今後の展望を分析してください。` +
-          `日本のNBAファンが最も注目するチームとして、プレーオフ争いの観点からも論じてください。`,
+          `${date}時点、${standTeam.teamCity} ${standTeam.teamName}は${standTeam.wins}勝${standTeam.losses}敗（勝率${winPctStr}%）で${conf}地区${standTeam.rank}位です。\n\n` +
+          `「このチームは本当に優勝候補か」という問いに答えてください。\n` +
+          `楽観論と悲観論の両方を展開し、最後にコラムニストとして断言してください。` +
+          `日本のNBAファンが最も注目するチームとして、ロスター構成・戦術・メンタリティの3軸で論じてください。`,
       }
     }
   }
@@ -393,9 +470,9 @@ function buildJapanInterestTheme(
   return null
 }
 
-// ─── テーマ3: ニッチな話題 ───────────────────────────────────────────
+// ─── テーマ3: カルチャー型（NBAの制度・文化・裏側）───────────────────
 
-function buildNicheTheme(
+function buildCultureTheme(
   data: NBALatestData,
   standings: StandingsData | null,
   date: string,
@@ -417,28 +494,31 @@ function buildNicheTheme(
     ? [
         `東1位: ${standings.east[0]?.teamCity} ${standings.east[0]?.teamName} (${standings.east[0]?.wins}W-${standings.east[0]?.losses}L)`,
         `西1位: ${standings.west[0]?.teamCity} ${standings.west[0]?.teamName} (${standings.west[0]?.wins}W-${standings.west[0]?.losses}L)`,
-        `東最下位圏: ${standings.east.slice(-5).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W-${t.losses}L)`).join(', ')}`,
-        `西最下位圏: ${standings.west.slice(-5).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W-${t.losses}L)`).join(', ')}`,
+        `東下位5チーム: ${standings.east.slice(-5).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W-${t.losses}L)`).join(', ')}`,
+        `西下位5チーム: ${standings.west.slice(-5).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W-${t.losses}L)`).join(', ')}`,
       ].join('\n')
     : 'データなし'
 
   return {
-    id: 'niche-data',
-    title: `${date} NBAの知られざるデータと記録`,
+    id: 'culture',
+    title: `${date} NBAの構造的問題を問う`,
     hasRealData: data.games.length > 0 || standings !== null,
     prompt:
       `以下は${date}時点のNBAデータです。\n\n` +
       `【昨夜の試合結果】\n${gamesSummary}\n\n` +
       `【順位表（抜粋）】\n${standingsSummary}\n\n` +
-      `このデータを使って、NBAファンが「知らなかった」と驚くようなニッチな切り口で記事を書いてください。\n` +
-      `一般的なニュースサイトが書かないテーマを必ず選んでください。\n` +
-      `推奨される切り口（どれか1つを深掘り）：\n` +
-      `・珍しいスタッツ記録（「○○が△△以来XX年ぶりの記録達成」など）\n` +
-      `・下位チームの隠れた好選手（「最下位チームのXXが実は効率リーグ上位」など）\n` +
-      `・意外なデータの比較（「○○のブロック数がチーム全体より多い」など）\n` +
-      `・歴史的な文脈との接続（「今季の3P成功率はNBA史上最高ペース」など）\n` +
-      `・戦術のトレンド変化（「ゾーンディフェンスの使用率が前年比+30%」など）\n` +
-      `提供データから客観的事実をベースに独自の分析視点を加えてください。`,
+      `上記データを「きっかけ」として、以下のテーマリストから最も今の状況に刺さるものを1つ選び、` +
+      `深く掘り下げた記事を書いてください。\n\n` +
+      `【テーマリスト（1つだけ選べ）】\n` +
+      `・NBAのタンキングはなぜ止まらないのか（下位チームのスタッツと戦略から論じる）\n` +
+      `・65試合ルールの矛盾──プレイタイム制限は誰を守り、誰を傷つけるのか\n` +
+      `・NBAの審判は本当にホームチームに有利な笛を吹くのか（統計的に検証する）\n` +
+      `・NBA選手の平均キャリアは4.5年。生き残る選手と消える選手の差は何か\n` +
+      `・3ポイント革命の限界──どこまで行けば「やりすぎ」になるのか\n` +
+      `・NBAとメンタルヘルス──休養を選んだ選手への批判は正当か\n` +
+      `・スーパーチーム時代の終焉──なぜ1強支配は続かなくなったのか\n\n` +
+      `選んだテーマが現在の試合データや順位表と接続できる場合は必ず接続させてください。` +
+      `一般的なニュースサイトには書けない、構造的・批評的な視点で。`,
   }
 }
 
@@ -452,10 +532,11 @@ function standingsThemes(standings: StandingsData, date: string): ArticleTheme[]
   if (eastFirst) {
     themes.push({
       id: 'east-leader',
-      title: `${eastFirst.teamCity} ${eastFirst.teamName}東地区首位の強さを解剖`,
+      title: `${eastFirst.teamCity} ${eastFirst.teamName}が東地区首位でいられる理由`,
       prompt:
-        `${date}時点、${eastFirst.teamCity} ${eastFirst.teamName}が東地区首位（${eastFirst.wins}勝${eastFirst.losses}敗・勝率${(eastFirst.winPct * 100).toFixed(1)}%）。` +
-        `この成績を支える戦術・ロスター構成・強みと弱点を徹底分析してください。`,
+        `${date}時点、${eastFirst.teamCity} ${eastFirst.teamName}が東地区首位（${eastFirst.wins}勝${eastFirst.losses}敗・勝率${(eastFirst.winPct * 100).toFixed(1)}%）に立っています。\n\n` +
+        `「このチームはなぜ勝てるのか」という問いに、批評的な視点で答えてください。` +
+        `強さの本質と、それが崩れるシナリオを両方示してください。`,
     })
   }
 
@@ -463,10 +544,11 @@ function standingsThemes(standings: StandingsData, date: string): ArticleTheme[]
   if (westFirst) {
     themes.push({
       id: 'west-leader',
-      title: `${westFirst.teamCity} ${westFirst.teamName}西地区首位の実力を分析`,
+      title: `${westFirst.teamCity} ${westFirst.teamName}西地区首位の死角`,
       prompt:
-        `${date}時点、${westFirst.teamCity} ${westFirst.teamName}が西地区首位（${westFirst.wins}勝${westFirst.losses}敗・勝率${(westFirst.winPct * 100).toFixed(1)}%）。` +
-        `チームの特徴、スター選手のパフォーマンス、優勝候補としての評価を論じてください。`,
+        `${date}時点、${westFirst.teamCity} ${westFirst.teamName}が西地区首位（${westFirst.wins}勝${westFirst.losses}敗・勝率${(westFirst.winPct * 100).toFixed(1)}%）に立っています。\n\n` +
+        `「このチームは優勝できるか」という問いに、楽観論と悲観論の両方を展開してください。` +
+        `コラムニストとして最後に断言すること。`,
     })
   }
 
@@ -475,10 +557,11 @@ function standingsThemes(standings: StandingsData, date: string): ArticleTheme[]
     const names = eastBubble.map((t) => `${t.teamCity} ${t.teamName}`).join('・')
     themes.push({
       id: 'east-bubble',
-      title: `東地区プレーイン争いの現状と行方`,
+      title: `プレーイン4チームの生存戦略──誰が笑い、誰が泣くのか`,
       prompt:
-        `${date}時点の東地区プレーイントーナメント争い。` +
-        `現在7〜10位を争う${names}の強み・弱み・残り試合の有利不利を比較し、プレーオフ進出予測を論じてください。`,
+        `${date}時点、東地区のプレーイン争いは${names}の間で激化しています。\n\n` +
+        `この4チームの「それぞれの物語」を書いてください。` +
+        `単なる順位比較ではなく、各チームが抱えるドラマと、最後に生き残るチームを予測してください。`,
     })
   }
 
@@ -496,16 +579,16 @@ async function selectThemes(
   const themes: ArticleTheme[] = []
   const { date, games } = data
 
-  // テーマ1: 昨夜のゲームレビュー
-  const gameTheme = buildGameReviewTheme(games, date)
-  if (gameTheme) themes.push(gameTheme)
+  // テーマ1: ドラマ型
+  const dramaTheme = buildDramaTheme(games, date)
+  if (dramaTheme) themes.push(dramaTheme)
 
-  // テーマ2: 日本人読者注目チーム・選手
-  const japanTheme = buildJapanInterestTheme(data, standings, recentArticles, date)
-  if (japanTheme) themes.push(japanTheme)
+  // テーマ2: 論争型
+  const debateTheme = buildDebateTheme(data, standings, recentArticles, date)
+  if (debateTheme) themes.push(debateTheme)
 
-  // テーマ3: ニッチな話題
-  themes.push(buildNicheTheme(data, standings, date))
+  // テーマ3: カルチャー型
+  themes.push(buildCultureTheme(data, standings, date))
 
   // フォールバック: standings テーマで補完
   if (themes.length < ARTICLE_COUNT && standings) {
@@ -521,15 +604,18 @@ async function selectThemes(
   const fallbacks: ArticleTheme[] = [
     {
       id: 'mvp-race',
-      title: '2025-26 MVPレース中間考察',
+      title: '2025-26 MVP候補5人に問う──あなたは誰を選ぶか',
       prompt:
-        '2025-26シーズンのNBA MVPレース候補選手をスタッツ・チーム成績・インパクトで比較分析してください。',
+        '2025-26シーズンのNBA MVPレース上位候補を挙げ、それぞれの「MVP論拠」と「反論」を示してください。' +
+        '最後に1人に絞り、その理由をコラムニストとして断言すること。',
     },
     {
-      id: 'analytics',
-      title: 'アドバンスドスタッツで読む2025-26シーズン',
+      id: 'three-point-revolution',
+      title: '3ポイント革命は終わるのか──シュート距離の果て',
       prompt:
-        '2025-26 NBAシーズンをPER・BPM・VORP・WSなどのアドバンスドスタッツで分析し、今シーズンのトレンドを解説してください。',
+        'NBAの3ポイント革命が始まってから10年以上が経った。' +
+        'この戦術はどこまで進化し、どこに限界があるのかを、歴史的文脈とデータで論じてください。' +
+        '「やりすぎ」のラインはどこか、コラムニストとして答えを出すこと。',
     },
   ]
   for (const fb of fallbacks) {
@@ -657,7 +743,10 @@ export async function run() {
   // テーマ選定
   const themes = await selectThemes(nbaData, standings, playerStats, recentArticles)
   console.log(`\nテーマ選定: ${themes.length}本`)
-  themes.forEach((t, i) => console.log(`  [${i + 1}] ${t.title}${t.hasRealData ? ' 📊' : ''}`))
+  themes.forEach((t, i) => {
+    const typeLabel = i === 0 ? '🎭 ドラマ' : i === 1 ? '💬 論争' : '🏛️ カルチャー'
+    console.log(`  [${i + 1}] ${typeLabel}: ${t.title}${t.hasRealData ? ' 📊' : ''}`)
+  })
 
   // 記事生成（順次実行・レート制限対策）
   let succeeded = 0
