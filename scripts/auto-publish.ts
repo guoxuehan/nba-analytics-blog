@@ -11,10 +11,7 @@ import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 import { parseDraft } from './_parse-draft'
-import { resolveThumbnail } from './_thumbnail'
 import type { DraftMeta } from './_parse-draft'
-import type { ThumbnailResult } from './_thumbnail'
-// サムネイルはpublic/images/thumbnails/に保存（Supabase Storageを使わない）
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -135,7 +132,6 @@ function logSchedule(index: number, publishedAt: Date, intervalHours: number): v
 type PublishItem = {
   meta: DraftMeta
   body: string
-  thumbnail: ThumbnailResult
   filename: string
 }
 
@@ -255,7 +251,7 @@ export async function run(): Promise<{ published: number; needsReview: number; s
     }
 
     console.log('   ✅ 公開キューに追加')
-    publishQueue.push({ meta, body, thumbnail: { url: null, source: 'none', label: '' }, filename: file })
+    publishQueue.push({ meta, body, filename: file })
   }
 
   if (publishQueue.length === 0) {
@@ -263,17 +259,8 @@ export async function run(): Promise<{ published: number; needsReview: number; s
     return { published: 0, needsReview, skipped }
   }
 
-  // ─── フェーズ2: サムネイル解決 ──────────────────────────────────
-  console.log(`\n【フェーズ2】サムネイル取得（${publishQueue.length}件）`)
-
-  for (const item of publishQueue) {
-    process.stdout.write(`   ${item.meta.slug} ... `)
-    item.thumbnail = await resolveThumbnail(item.meta, item.meta.slug)
-    console.log(item.thumbnail.label)
-  }
-
-  // ─── フェーズ3: 公開時刻を割り当てて一括 INSERT ──────────────────
-  console.log(`\n【フェーズ3】公開スケジュール設定・一括 INSERT`)
+  // ─── フェーズ2: 公開時刻を割り当てて一括 INSERT ──────────────────
+  console.log(`\n【フェーズ2】公開スケジュール設定・一括 INSERT`)
 
   const baseTime = new Date()
   const rows = publishQueue.map((item, index) => {
@@ -288,7 +275,7 @@ export async function run(): Promise<{ published: number; needsReview: number; s
       tags: item.meta.tags,
       excerpt: item.meta.excerpt || null,
       content: item.body,
-      thumbnail_url: item.thumbnail.url ?? null,
+      thumbnail_url: null,
       published: true,
       published_at: publishedAt.toISOString(),
       created_at: now,

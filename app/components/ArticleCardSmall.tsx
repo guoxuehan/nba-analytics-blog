@@ -1,19 +1,21 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { type Post, getCategoryGradient, getCategoryLabel, formatDate, getPostDate } from '@/lib/posts'
+import { type Post, getCategoryAccent, getCategoryLabel, formatDate, getPostDate } from '@/lib/posts'
 
 type Props = { post: Post }
 
 export function ArticleCardSmall({ post }: Props) {
+  const accent = getCategoryAccent(post.category)
+
   return (
     <article className="border-b border-border last:border-b-0">
       <Link href={`/articles/${post.slug}`} className="group flex gap-3 py-3 items-start">
-        {/* 正方形サムネイル */}
-        <div
-          className="shrink-0 overflow-hidden rounded-[2px] relative"
-          style={{ width: '76px', height: '76px' }}
-        >
-          {post.thumbnail_url ? (
+        {/* thumbnail_url が設定されている記事のみ画像を表示、なければカラードット */}
+        {post.thumbnail_url ? (
+          <div
+            className="shrink-0 overflow-hidden rounded-[2px] relative"
+            style={{ width: '72px', height: '72px' }}
+          >
             <Image
               src={post.thumbnail_url}
               alt={post.title}
@@ -21,18 +23,21 @@ export function ArticleCardSmall({ post }: Props) {
               className="object-cover"
               sizes="100px"
             />
-          ) : (
-            <div
-              className="w-full h-full"
-              style={{ background: getCategoryGradient(post.category) }}
-              aria-hidden="true"
-            />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div
+            className="shrink-0 rounded-[2px]"
+            style={{ width: '3px', height: '72px', background: accent, opacity: 0.8 }}
+            aria-hidden="true"
+          />
+        )}
 
         {/* テキスト */}
         <div className="flex flex-col min-w-0 py-0.5 gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent font-heading">
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.1em] font-heading"
+            style={{ color: accent }}
+          >
             {getCategoryLabel(post.category)}
           </span>
 

@@ -10,7 +10,7 @@ import {
   getRecentPosts,
   getPublishedPosts,
   calculateReadingTime,
-  getCategoryGradient,
+  getCategoryAccent,
   getCategoryLabel,
   formatDate,
   getPostDate,
@@ -54,7 +54,14 @@ export async function generateMetadata({
       publishedTime: getPostDate(post),
       url: `${siteUrl}/articles/${post.slug}`,
       siteName: 'NBA COURT VISION',
-      ...(post.thumbnail_url ? { images: [{ url: post.thumbnail_url }] } : {}),
+      images: [
+        {
+          url: `${siteUrl}/api/og?title=${encodeURIComponent(post.title)}&category=${post.category}`,
+          width: 1200,
+          height: 630,
+          alt: post.title,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
@@ -111,9 +118,10 @@ export default async function ArticlePage({
       '@type': 'Organization',
       name: 'NBA COURT VISION',
     },
-    ...(post.thumbnail_url
-      ? { image: { '@type': 'ImageObject', url: post.thumbnail_url } }
-      : {}),
+    image: {
+      '@type': 'ImageObject',
+      url: `${siteUrl}/api/og?title=${encodeURIComponent(post.title)}&category=${post.category}`,
+    },
   }
 
   return (
@@ -126,15 +134,18 @@ export default async function ArticlePage({
 
       <article>
         {/* ── 記事ヘッダー ──────────────────────────────────────── */}
-        <header className="border-b border-border">
-          <div className="container-content py-8 md:py-10">
+        <header
+          className="border-b border-border"
+          style={{ borderLeft: `4px solid ${getCategoryAccent(post.category)}` }}
+        >
+          <div className="container-content py-8 md:py-12">
             <div style={{ maxWidth: '760px' }}>
               {/* カテゴリバッジ */}
               <Link
                 href={`/category/${post.category}`}
                 className="inline-block text-[11px] font-bold uppercase tracking-[0.1em] px-2 py-[3px] mb-4 hover:opacity-80 transition-opacity"
                 style={{
-                  background: 'var(--accent)',
+                  background: getCategoryAccent(post.category),
                   color: '#fff',
                   borderRadius: '2px',
                   fontFamily: 'var(--font-heading)',
@@ -147,14 +158,23 @@ export default async function ArticlePage({
               <h1
                 className="font-heading font-bold text-text-primary uppercase"
                 style={{
-                  fontSize: 'clamp(28px, 3.5vw, 40px)',
+                  fontSize: 'clamp(30px, 4vw, 46px)',
                   letterSpacing: '-0.02em',
-                  lineHeight: '1.1',
+                  lineHeight: '1.08',
                 }}
               >
                 {post.title}
               </h1>
 
+              {/* 抜粋 */}
+              {post.excerpt && (
+                <p
+                  className="mt-4 text-text-secondary font-body leading-relaxed"
+                  style={{ fontSize: '16px', maxWidth: '640px' }}
+                >
+                  {post.excerpt}
+                </p>
+              )}
 
               {/* メタ情報（日付・読了時間） */}
               <div className="flex items-center gap-4 mt-5">
@@ -177,13 +197,13 @@ export default async function ArticlePage({
           </div>
         </header>
 
-        {/* ── ヒーロー画像（任意） ──────────────────────────────── */}
-        <div className="container-content pt-6 pb-0">
-          <div
-            className="w-full rounded-[4px] overflow-hidden relative"
-            style={{ height: 'clamp(200px, 40vw, 480px)' }}
-          >
-            {post.thumbnail_url ? (
+        {/* thumbnail_url が設定されている記事のみヒーロー画像を表示 */}
+        {post.thumbnail_url && (
+          <div className="container-content pt-6 pb-0">
+            <div
+              className="w-full rounded-[4px] overflow-hidden relative"
+              style={{ height: 'clamp(200px, 40vw, 480px)' }}
+            >
               <Image
                 src={post.thumbnail_url}
                 alt={post.title}
@@ -192,16 +212,9 @@ export default async function ArticlePage({
                 priority
                 sizes="(max-width: 1200px) 100vw, 1200px"
               />
-            ) : (
-              <div
-                className="absolute inset-0"
-                style={{ background: getCategoryGradient(post.category) }}
-                role="img"
-                aria-label={post.title}
-              />
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── 本文レイアウト ────────────────────────────────────── */}
         <div className="container-content py-8">

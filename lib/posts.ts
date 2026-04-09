@@ -29,10 +29,17 @@ export function calculateReadingTime(content: string): number {
 // ─── カテゴリ別プレースホルダーグラデーション ─────────────────
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  player_analysis: 'linear-gradient(155deg, #0a1628 0%, #0f2744 60%, #153455 100%)',
-  team_analysis:   'linear-gradient(155deg, #0a150a 0%, #112211 60%, #172b17 100%)',
-  tactics:         'linear-gradient(155deg, #1a0800 0%, #3a1200 60%, #4a1a00 100%)',
-  data:            'linear-gradient(155deg, #090912 0%, #10101e 60%, #191930 100%)',
+  player_analysis: 'linear-gradient(155deg, #1c0000 0%, #380000 60%, #4d0a0a 100%)',  // Dark Red
+  team_analysis:   'linear-gradient(155deg, #0a1628 0%, #0f2744 60%, #153455 100%)',  // Dark Blue
+  tactics:         'linear-gradient(155deg, #0a150a 0%, #112211 60%, #172b17 100%)',  // Dark Green
+  data:            'linear-gradient(155deg, #090912 0%, #10101e 60%, #191930 100%)',  // Dark Purple
+}
+
+const CATEGORY_ACCENTS: Record<string, string> = {
+  player_analysis: '#c0392b',
+  team_analysis:   '#1a6496',
+  tactics:         '#2e7d32',
+  data:            '#6a1fa6',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -48,6 +55,10 @@ export function getCategoryLabel(category: string): string {
 
 export function getCategoryGradient(category: string): string {
   return CATEGORY_GRADIENTS[category] ?? 'linear-gradient(155deg, #0d0d0d 0%, #1a1a1a 100%)'
+}
+
+export function getCategoryAccent(category: string): string {
+  return CATEGORY_ACCENTS[category] ?? '#c0392b'
 }
 
 // ─── 日付ユーティリティ ──────────────────────────────────────
