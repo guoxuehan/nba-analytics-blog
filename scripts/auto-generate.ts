@@ -1,7 +1,7 @@
 /**
  * 記事自動生成スクリプト
  * - data/nba-latest.json を読み込み
- * - 3テーマを自動選定（ドラマ型・論争型・カルチャー型）
+ * - 3テーマを自動選定（ドラマ型・論争型・ローテーション型）
  * - Claude APIで記事を生成
  * - articles-draft/ に保存
  */
@@ -19,6 +19,7 @@ const DATA_DIR = path.resolve(process.cwd(), 'data')
 const DRAFT_DIR = path.resolve(process.cwd(), 'articles-draft')
 const MODEL = 'claude-sonnet-4-20250514'
 const ARTICLE_COUNT = 3
+const LOW_WIN_PCT_THRESHOLD = 0.300
 
 type ArticleTheme = {
   id: string
@@ -157,7 +158,8 @@ async function fetchRecentArticles(): Promise<RecentArticle[]> {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseKey)
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    // 14日間に拡張（チーム7日・テーマ5日・タンキング月2回チェック用）
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data } = await supabase
       .from('articles')
       .select('slug, title, tags, published_at')
@@ -169,6 +171,9 @@ async function fetchRecentArticles(): Promise<RecentArticle[]> {
   }
 }
 
+// ─── 重複チェックヘルパー ─────────────────────────────────────────────
+
+/** title+tags にキーワードが含まれる記事が直近N日以内にあるか */
 function wasRecentlyCovered(
   keywords: string[],
   recentArticles: RecentArticle[],
@@ -181,6 +186,61 @@ function wasRecentlyCovered(
     const text = `${article.title} ${article.tags.join(' ')}`
     return keywords.some((kw) => text.toLowerCase().includes(kw.toLowerCase()))
   })
+}
+
+/** title にチーム名が含まれる記事が直近N日以内にあるか */
+function wasTeamInTitle(
+  teamName: string,
+  recentArticles: RecentArticle[],
+  withinDays: number,
+): boolean {
+  const cutoffMs = Date.now() - withinDays * 24 * 60 * 60 * 1000
+  return recentArticles.some((article) => {
+    const pubMs = article.published_at ? new Date(article.published_at).getTime() : 0
+    return pubMs >= cutoffMs && article.title.toLowerCase().includes(teamName.toLowerCase())
+  })
+}
+
+/** slug にパターンが含まれる記事が直近N日以内にあるか */
+function wasSlugPatternCovered(
+  patterns: string[],
+  recentArticles: RecentArticle[],
+  withinDays: number,
+): boolean {
+  const cutoffMs = Date.now() - withinDays * 24 * 60 * 60 * 1000
+  return recentArticles.some((article) => {
+    const pubMs = article.published_at ? new Date(article.published_at).getTime() : 0
+    return (
+      pubMs >= cutoffMs &&
+      patterns.some((p) => article.slug.toLowerCase().includes(p.toLowerCase()))
+    )
+  })
+}
+
+/** title+tags+slug にキーワードが含まれる記事数を数える */
+function countKeywordArticles(
+  keywords: string[],
+  recentArticles: RecentArticle[],
+  withinDays: number,
+): number {
+  const cutoffMs = Date.now() - withinDays * 24 * 60 * 60 * 1000
+  return recentArticles.filter((article) => {
+    const pubMs = article.published_at ? new Date(article.published_at).getTime() : 0
+    if (pubMs < cutoffMs) return false
+    const text = `${article.title} ${article.tags.join(' ')} ${article.slug}`.toLowerCase()
+    return keywords.some((kw) => text.includes(kw.toLowerCase()))
+  }).length
+}
+
+/** 勝率が threshold 以下のチーム名一覧を返す */
+function getLowWinPctTeamNames(
+  standings: StandingsData | null,
+  threshold: number,
+): string[] {
+  if (!standings) return []
+  return [...standings.east, ...standings.west]
+    .filter((t) => t.winPct <= threshold)
+    .map((t) => `${t.teamCity} ${t.teamName}`)
 }
 
 // ─── 選手スタッツのフォーマット ──────────────────────────────────────
@@ -228,8 +288,25 @@ function loadStandings(): StandingsData | null {
 
 // ─── テーマ1: ドラマ型（昨夜の試合から「物語」を探す）────────────────
 
-function buildDramaTheme(games: GameSummary[], date: string): ArticleTheme | null {
+function buildDramaTheme(
+  games: GameSummary[],
+  date: string,
+  recentArticles: RecentArticle[],
+): ArticleTheme | null {
   if (games.length === 0) return null
+
+  // チームタイトル重複チェック
+  function isTeamBlocked(homeTeam: string, awayTeam: string): boolean {
+    if (wasTeamInTitle(homeTeam, recentArticles, 7)) {
+      console.log(`  除外候補（ドラマ）: ${homeTeam} → 直近7日以内にタイトルに同チーム記事あり`)
+      return true
+    }
+    if (wasTeamInTitle(awayTeam, recentArticles, 7)) {
+      console.log(`  除外候補（ドラマ）: ${awayTeam} → 直近7日以内にタイトルに同チーム記事あり`)
+      return true
+    }
+    return false
+  }
 
   // 全試合の最高得点を収集
   type ScoringHero = { player: string; pts: number; game: GameSummary }
@@ -244,9 +321,9 @@ function buildDramaTheme(games: GameSummary[], date: string): ArticleTheme | nul
   heroes.sort((a, b) => b.pts - a.pts)
 
   // 優先a: 個人のマイルストーン候補（38点以上 = キャリアハイ水準）
-  const milestoneHero = heroes.find((h) => h.pts >= 38)
-  if (milestoneHero) {
+  for (const milestoneHero of heroes.filter((h) => h.pts >= 38)) {
     const g = milestoneHero.game
+    if (isTeamBlocked(g.homeTeam, g.awayTeam)) continue
     const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
     const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     return {
@@ -264,11 +341,12 @@ function buildDramaTheme(games: GameSummary[], date: string): ArticleTheme | nul
     }
   }
 
-  // 優先b: 大逆転の可能性（アウェイチームが10点差以上で勝利 = 下馬評覆し）
-  const bigAwayWin = games
+  // 優先b: 大逆転の可能性（アウェイチームが10点差以上で勝利）
+  const bigAwayWins = games
     .filter((g) => g.winner === g.awayTeam && g.scoreDiff >= 10)
-    .sort((a, b) => b.scoreDiff - a.scoreDiff)[0]
-  if (bigAwayWin) {
+    .sort((a, b) => b.scoreDiff - a.scoreDiff)
+  for (const bigAwayWin of bigAwayWins) {
+    if (isTeamBlocked(bigAwayWin.homeTeam, bigAwayWin.awayTeam)) continue
     const leadersText = formatLeaders(bigAwayWin.leaders, bigAwayWin.homeTeam, bigAwayWin.awayTeam)
     return {
       id: 'drama',
@@ -284,10 +362,10 @@ function buildDramaTheme(games: GameSummary[], date: string): ArticleTheme | nul
     }
   }
 
-  // 優先d: 異常スタッツ（35点以上）
-  const topHero = heroes[0]
-  if (topHero && topHero.pts >= 35) {
+  // 優先c: 異常スタッツ（35点以上）
+  for (const topHero of heroes.filter((h) => h.pts >= 35)) {
     const g = topHero.game
+    if (isTeamBlocked(g.homeTeam, g.awayTeam)) continue
     const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
     const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     return {
@@ -304,10 +382,10 @@ function buildDramaTheme(games: GameSummary[], date: string): ArticleTheme | nul
     }
   }
 
-  // フォールバック: 接戦のドラマ
+  // 優先d: 接戦のドラマ（重複チェック付き）
   const closeGames = games.filter((g) => g.scoreDiff <= 5).sort((a, b) => a.scoreDiff - b.scoreDiff)
-  if (closeGames.length > 0) {
-    const g = closeGames[0]
+  for (const g of closeGames) {
+    if (isTeamBlocked(g.homeTeam, g.awayTeam)) continue
     const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
     const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     return {
@@ -323,10 +401,11 @@ function buildDramaTheme(games: GameSummary[], date: string): ArticleTheme | nul
     }
   }
 
-  // 最終フォールバック: 最も印象的な試合
+  // フォールバック: 重複チェックを無視して最も印象的な試合（候補が尽きた場合）
   const bigWin = games.reduce((prev, cur) => (cur.scoreDiff > prev.scoreDiff ? cur : prev))
   const loser = bigWin.homeTeam === bigWin.winner ? bigWin.awayTeam : bigWin.homeTeam
   const leadersText = formatLeaders(bigWin.leaders, bigWin.homeTeam, bigWin.awayTeam)
+  console.log(`  ⚠️  ドラマテーマ: 全候補が重複チェックに引っかかりフォールバックを使用`)
   return {
     id: 'drama',
     title: `${bigWin.winner}が${loser}を圧倒した夜`,
@@ -367,7 +446,16 @@ function buildDebateTheme(
       const teamDef = JAPAN_INTEREST_TEAMS.find((t) => t.abbr === abbr)
 
       if (teamDef) {
-        if (wasRecentlyCovered([teamDef.ja, abbr, teamName], recentArticles, 3)) continue
+        // チーム名がタイトルに含まれる記事を7日間除外
+        if (wasTeamInTitle(teamDef.ja, recentArticles, 7)) {
+          console.log(`  除外（論争・チーム）: ${teamDef.ja} → 直近7日以内にタイトルに同チーム記事あり`)
+          continue
+        }
+        if (wasTeamInTitle(teamName, recentArticles, 7)) {
+          console.log(`  除外（論争・チーム）: ${teamName} → 直近7日以内にタイトルに同チーム記事あり`)
+          continue
+        }
+
         let priority = teamDef.priority
         let playerFocus: string | undefined
 
@@ -399,7 +487,10 @@ function buildDebateTheme(
         for (const player of JAPAN_INTEREST_PLAYERS) {
           const found = leaders.find((l) => l.playerName.includes(player.en))
           if (!found) continue
-          if (wasRecentlyCovered([player.ja, player.en], recentArticles, 3)) continue
+          if (wasRecentlyCovered([player.ja, player.en], recentArticles, 7)) {
+            console.log(`  除外（論争・選手）: ${player.ja} → 直近7日以内に同選手記事あり`)
+            continue
+          }
           const team = side === 'home' ? game.homeTeam : game.awayTeam
           const teamAbbr = side === 'home' ? game.homeTeamAbbr : game.awayTeamAbbr
           candidates.push({
@@ -449,7 +540,10 @@ function buildDebateTheme(
   if (standings) {
     const sortedTeams = [...JAPAN_INTEREST_TEAMS].sort((a, b) => b.priority - a.priority)
     for (const teamDef of sortedTeams) {
-      if (wasRecentlyCovered([teamDef.ja, teamDef.abbr], recentArticles, 3)) continue
+      if (wasTeamInTitle(teamDef.ja, recentArticles, 7)) {
+        console.log(`  除外（論争・順位表）: ${teamDef.ja} → 直近7日以内にタイトルに同チーム記事あり`)
+        continue
+      }
       const allTeams = [...standings.east, ...standings.west]
       const standTeam = allTeams.find((t) => t.teamId === teamDef.abbr)
       if (!standTeam) continue
@@ -470,56 +564,262 @@ function buildDebateTheme(
   return null
 }
 
-// ─── テーマ3: カルチャー型（NBAの制度・文化・裏側）───────────────────
+// ─── テーマ3: ローテーション型（曜日別テーマ）──────────────────────────
 
-function buildCultureTheme(
+type RotationEntry = {
+  dow: number
+  label: string
+  type: string
+  keywords: string[]       // 重複チェック用キーワード（title+tags）
+  slugPatterns: string[]   // スラッグパターン重複チェック
+  dedupDays: number
+  build: (data: NBALatestData, standings: StandingsData | null, date: string) => ArticleTheme
+}
+
+const ROTATION_SCHEDULE: RotationEntry[] = [
+  {
+    dow: 0, // 日曜
+    label: '日曜：週間ベスト',
+    type: 'weekly-best',
+    keywords: ['週間ベスト', '週間MVP', 'ベストプレー', 'weekly best'],
+    slugPatterns: ['weekly-best', 'week-in-review'],
+    dedupDays: 7,
+    build: (data, _standings, date) => {
+      const gamesSummary =
+        data.games.length > 0
+          ? data.games
+              .map((g) => {
+                const pts = [...(g.leaders?.home ?? []), ...(g.leaders?.away ?? [])]
+                  .filter((l) => l.stat === 'pts')
+                  .map((l) => `${l.playerName} ${l.value}pts`)
+                  .join(', ')
+                return `${g.homeTeam} ${g.homeScore} vs ${g.awayTeam} ${g.awayScore}${pts ? ` (${pts})` : ''}`
+              })
+              .join('\n')
+          : 'データなし'
+      return {
+        id: 'weekly-best',
+        title: `今週のNBAベストパフォーマンス──誰が最も輝いたか`,
+        hasRealData: data.games.length > 0,
+        prompt:
+          `${date}週のNBA。直近の試合結果：\n${gamesSummary}\n\n` +
+          `今週最も印象に残ったパフォーマンスTOP3を選べ。` +
+          `選出理由を「数字の大きさ」ではなく「文脈と意味」で説明せよ。` +
+          `この週のMVP候補は誰か、コラムニストとして断言し、その根拠を述べよ。` +
+          `読者が「そうか、あの試合はそういう意味があったのか」と気づく視点で書け。`,
+      }
+    },
+  },
+  {
+    dow: 1, // 月曜
+    label: '月曜：戦術分析',
+    type: 'tactics',
+    keywords: ['戦術', 'tactics', 'ディフェンス戦略', 'オフェンス戦略', 'プレーセット'],
+    slugPatterns: ['tactics', 'defense-scheme', 'offensive-system'],
+    dedupDays: 5,
+    build: (data, _standings, date) => {
+      const gamesSummary =
+        data.games.length > 0
+          ? data.games.map((g) => `${g.homeTeam} ${g.homeScore} vs ${g.awayTeam} ${g.awayScore}`).join(', ')
+          : 'データなし'
+      return {
+        id: 'tactics',
+        title: `NBAの戦術進化──直近の試合が示す新潮流`,
+        hasRealData: data.games.length > 0,
+        prompt:
+          `${date}のNBA試合: ${gamesSummary}\n\n` +
+          `直近の試合データから、最も興味深い戦術的パターンを1つ特定し詳しく分析せよ。` +
+          `特定のプレーセット、ディフェンスシステム、またはマッチアップ戦略に焦点を当てよ。` +
+          `「なぜこの戦術が機能したのか／しなかったのか」を、` +
+          `コーチングの決断・選手の適性・相手チームの対応という3つの軸で論じろ。` +
+          `結論として「NBAの戦術がどこへ向かっているか」を断言せよ。`,
+      }
+    },
+  },
+  {
+    dow: 2, // 火曜
+    label: '火曜：歴代比較',
+    type: 'legend-compare',
+    keywords: ['歴代', 'レジェンド', '比較', 'legend', 'greatest'],
+    slugPatterns: ['vs-legend', 'greatest', 'all-time', 'comparison'],
+    dedupDays: 5,
+    build: (_data, _standings, date) => ({
+      id: 'legend-compare',
+      title: `現役スターとレジェンドの比較──時代を超えた問い`,
+      hasRealData: false,
+      prompt:
+        `${date}のNBAシーズンを踏まえ、現役スターとNBAレジェンドを1対1で比較せよ。` +
+        `単なるスタッツ比較ではなく、プレーの質・時代背景・チームへの影響・` +
+        `勝利へのコントリビューションを含めた本質的な議論を展開せよ。` +
+        `比較するペアは日本のNBAファンが最も関心を持つ組み合わせを選べ（例：レブロン vs マジック、カリー vs レジー・ミラー等）。` +
+        `最終的に「現役選手はレジェンドを超えたのか」という問いに答えよ。`,
+    }),
+  },
+  {
+    dow: 3, // 水曜
+    label: '水曜：制度・ルール',
+    type: 'rules',
+    keywords: ['CBA', '65試合', 'ルール問題', '制度', '契約問題', 'ドラフト制度'],
+    slugPatterns: ['cba', 'rule-change', 'draft-system', 'max-contract', '65-game'],
+    dedupDays: 5,
+    build: (data, standings, date) => {
+      const standingsSummary = standings
+        ? `東1位: ${standings.east[0]?.teamCity} ${standings.east[0]?.teamName} (${standings.east[0]?.wins}W-${standings.east[0]?.losses}L), ` +
+          `西1位: ${standings.west[0]?.teamCity} ${standings.west[0]?.teamName} (${standings.west[0]?.wins}W-${standings.west[0]?.losses}L)`
+        : 'データなし'
+      return {
+        id: 'nba-rules',
+        title: `NBAの制度的矛盾──誰も語らない本質的な問題`,
+        hasRealData: standings !== null,
+        prompt:
+          `${date}時点のNBA。順位: ${standingsSummary}\n\n` +
+          `NBAの制度・ルール・CBAに関する問題を1つ選び、その矛盾や弊害を批評的に論じよ。\n\n` +
+          `【選択可能なトピック】\n` +
+          `・65試合出場ルールの矛盾──プレイタイム制限は誰を守り、誰を傷つけるか\n` +
+          `・NBAドラフト制度の公平性──同じ負け方でも評価が変わる理由\n` +
+          `・最大契約の弊害──スーパースターに払いすぎるとチームはどうなるか\n` +
+          `・ロードマネジメント問題──「休養」はファンへの裏切りか、選手保護か\n` +
+          `・NBAの審判制度──判定基準の一貫性欠如は構造的問題か\n` +
+          `・トレードデッドライン制度の限界──なぜ大型トレードは成立しにくくなったか\n\n` +
+          `※ タンキング戦略を主題にしないこと。\n\n` +
+          `選んだトピックを現在のシーズン状況と接続させ、` +
+          `「制度を変えるべきか、変えるならどう変えるか」をコラムニストとして断言せよ。`,
+      }
+    },
+  },
+  {
+    dow: 4, // 木曜
+    label: '木曜：若手・ルーキー',
+    type: 'rookie',
+    keywords: ['ルーキー', '若手', 'ドラフト候補', '新人', '次世代'],
+    slugPatterns: ['rookie', 'young-star', 'next-gen', 'draft-prospect'],
+    dedupDays: 5,
+    build: (data, _standings, date) => {
+      const gamesSummary =
+        data.games.length > 0
+          ? data.games.map((g) => `${g.homeTeam} vs ${g.awayTeam}`).join(', ')
+          : ''
+      return {
+        id: 'young-star',
+        title: `NBAの次世代──今シーズン最も成長した若手は誰か`,
+        hasRealData: data.games.length > 0,
+        prompt:
+          `${date}のNBAシーズン${gamesSummary ? `（直近試合: ${gamesSummary}）` : ''}。\n\n` +
+          `今シーズン最も成長した若手選手（25歳以下）を1人特定し、その成長の本質を論じよ。` +
+          `数字の伸びではなく、プレースタイルの変化・精神的成熟・チームへの影響を描写せよ。` +
+          `「この選手はNBAのどんな問題を解決できるか」という視点で、` +
+          `その選手の将来像をコラムニストとして描け。` +
+          `日本のNBAファンが「この選手を追いかけたい」と思わせる切り口で書け。`,
+      }
+    },
+  },
+  {
+    dow: 5, // 金曜
+    label: '金曜：予想・シミュレーション',
+    type: 'prediction',
+    keywords: ['プレーオフ予想', 'トレード予想', 'シミュレーション', '優勝予想'],
+    slugPatterns: ['playoff-prediction', 'trade-speculation', 'championship-odds'],
+    dedupDays: 5,
+    build: (_data, standings, date) => {
+      const standingsSummary = standings
+        ? [
+            `東: ${standings.east.slice(0, 4).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W)`).join(', ')}`,
+            `西: ${standings.west.slice(0, 4).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W)`).join(', ')}`,
+          ].join('\n')
+        : 'データなし'
+      return {
+        id: 'playoff-prediction',
+        title: `プレーオフを制するのは誰か──3チームに絞る予想`,
+        hasRealData: standings !== null,
+        prompt:
+          `${date}時点のNBAプレーオフ展望。\n現在の順位（抜粋）:\n${standingsSummary}\n\n` +
+          `チャンピオンシップコンテンダーを3チームに絞り、それぞれの「勝つシナリオ」と` +
+          `「崩れるシナリオ」を具体的に論じよ。` +
+          `プレーオフの洗礼・負傷リスク・マッチアップの相性・ホームコートアドバンテージを考慮せよ。` +
+          `最後に1チームに絞り「このチームが優勝する」と断言し、その根拠を述べよ。` +
+          `読者が「この予想は面白い、外れたとしても論拠がある」と感じる記事にせよ。`,
+      }
+    },
+  },
+  {
+    dow: 6, // 土曜
+    label: '土曜：カルチャー',
+    type: 'culture',
+    keywords: ['SNS', 'ファン文化', 'NBAビジネス', 'メンタルヘルス', 'スーパーチーム'],
+    slugPatterns: ['culture', 'social-media', 'nba-business', 'mental-health', 'superteam'],
+    dedupDays: 5,
+    build: (_data, _standings, date) => ({
+      id: 'culture',
+      title: `NBAを「競技」から「文化」へ──現代バスケットボールの本質`,
+      hasRealData: false,
+      prompt:
+        `${date}のNBAシーズンを踏まえ、以下のテーマから1つ選び、` +
+        `NBAが単なるスポーツを超えた文化現象であることを論じよ。\n\n` +
+        `【選択可能なトピック】\n` +
+        `・NBAとメンタルヘルス──休養を選んだ選手への批判は正当か\n` +
+        `・スーパーチーム時代の終焉──なぜ1強支配は続かなくなったのか\n` +
+        `・NBAとSNS──選手の「ブランド化」はゲームをどう変えたか\n` +
+        `・NBAのグローバル化──なぜ世界中の選手がNBAを目指すのか\n` +
+        `・ファン文化の変容──SNS時代のNBAファンは選手に何を求めるのか\n` +
+        `・NBAのビジネスモデル──30チームのフランチャイズ価値が上がり続ける理由\n\n` +
+        `一般的なニュースサイトには書けない、構造的・批評的な視点で。` +
+        `最後に「NBAは10年後どうなっているか」という問いを読者に投げかけて締めよ。`,
+    }),
+  },
+]
+
+function buildRotationTheme(
   data: NBALatestData,
   standings: StandingsData | null,
+  recentArticles: RecentArticle[],
   date: string,
-): ArticleTheme {
-  const gamesSummary =
-    data.games.length > 0
-      ? data.games
-          .map((g) => {
-            const pts = [...(g.leaders?.home ?? []), ...(g.leaders?.away ?? [])]
-              .filter((l) => l.stat === 'pts')
-              .map((l) => `${l.playerName} ${l.value}pts`)
-              .join(', ')
-            return `${g.homeTeam} ${g.homeScore} vs ${g.awayTeam} ${g.awayScore}${pts ? ` (${pts})` : ''}`
-          })
-          .join('\n')
-      : 'データなし'
+): { theme: ArticleTheme; logs: string[] } {
+  const logs: string[] = []
+  const dayOfWeek = new Date().getDay() // 0=Sun...6=Sat
 
-  const standingsSummary = standings
-    ? [
-        `東1位: ${standings.east[0]?.teamCity} ${standings.east[0]?.teamName} (${standings.east[0]?.wins}W-${standings.east[0]?.losses}L)`,
-        `西1位: ${standings.west[0]?.teamCity} ${standings.west[0]?.teamName} (${standings.west[0]?.wins}W-${standings.west[0]?.losses}L)`,
-        `東下位5チーム: ${standings.east.slice(-5).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W-${t.losses}L)`).join(', ')}`,
-        `西下位5チーム: ${standings.west.slice(-5).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W-${t.losses}L)`).join(', ')}`,
-      ].join('\n')
-    : 'データなし'
-
-  return {
-    id: 'culture',
-    title: `${date} NBAの構造的問題を問う`,
-    hasRealData: data.games.length > 0 || standings !== null,
-    prompt:
-      `以下は${date}時点のNBAデータです。\n\n` +
-      `【昨夜の試合結果】\n${gamesSummary}\n\n` +
-      `【順位表（抜粋）】\n${standingsSummary}\n\n` +
-      `上記データを「きっかけ」として、以下のテーマリストから最も今の状況に刺さるものを1つ選び、` +
-      `深く掘り下げた記事を書いてください。\n\n` +
-      `【テーマリスト（1つだけ選べ）】\n` +
-      `・NBAのタンキングはなぜ止まらないのか（下位チームのスタッツと戦略から論じる）\n` +
-      `・65試合ルールの矛盾──プレイタイム制限は誰を守り、誰を傷つけるのか\n` +
-      `・NBAの審判は本当にホームチームに有利な笛を吹くのか（統計的に検証する）\n` +
-      `・NBA選手の平均キャリアは4.5年。生き残る選手と消える選手の差は何か\n` +
-      `・3ポイント革命の限界──どこまで行けば「やりすぎ」になるのか\n` +
-      `・NBAとメンタルヘルス──休養を選んだ選手への批判は正当か\n` +
-      `・スーパーチーム時代の終焉──なぜ1強支配は続かなくなったのか\n\n` +
-      `選んだテーマが現在の試合データや順位表と接続できる場合は必ず接続させてください。` +
-      `一般的なニュースサイトには書けない、構造的・批評的な視点で。`,
+  // タンキング月2回制限チェック
+  const tankingKeywords = ['タンキング', 'tank', 'tanking']
+  const tankCount30 = countKeywordArticles(tankingKeywords, recentArticles, 30)
+  if (tankCount30 >= 2) {
+    logs.push(`⚠️  タンキング記事を制限中（直近30日: ${tankCount30}件 / 月2件まで）`)
   }
+
+  // 低勝率チーム週1回制限チェック
+  const lowWinPctTeams = getLowWinPctTeamNames(standings, LOW_WIN_PCT_THRESHOLD)
+  const lowTeamCount7 = lowWinPctTeams.length > 0
+    ? countKeywordArticles(lowWinPctTeams, recentArticles, 7)
+    : 0
+  if (lowTeamCount7 >= 1) {
+    logs.push(`⚠️  下位チーム（勝率${(LOW_WIN_PCT_THRESHOLD * 100).toFixed(0)}%以下）記事を制限中（直近7日: ${lowTeamCount7}件）`)
+  }
+
+  // 本日の曜日から順にローテーションを試みる
+  const order = Array.from({ length: 7 }, (_, i) => (dayOfWeek + i) % 7)
+
+  for (const dow of order) {
+    const entry = ROTATION_SCHEDULE.find((e) => e.dow === dow)
+    if (!entry) continue
+
+    // テーマキーワードの重複チェック（N日以内）
+    if (wasRecentlyCovered(entry.keywords, recentArticles, entry.dedupDays)) {
+      logs.push(`除外（${entry.label}）: 直近${entry.dedupDays}日以内に同テーマキーワード記事あり`)
+      continue
+    }
+
+    // スラッグパターンの重複チェック（7日以内）
+    if (wasSlugPatternCovered(entry.slugPatterns, recentArticles, 7)) {
+      logs.push(`除外（${entry.label}）: 直近7日以内に同スラッグパターン記事あり`)
+      continue
+    }
+
+    logs.push(`選択: ${entry.label}（${date}）`)
+    return { theme: entry.build(data, standings, date), logs }
+  }
+
+  // 全曜日が重複 → 本日の曜日を強制使用
+  const fallbackEntry = ROTATION_SCHEDULE.find((e) => e.dow === dayOfWeek)!
+  logs.push(`⚠️  全ローテーションテーマが重複 → ${fallbackEntry.label}を強制選択`)
+  return { theme: fallbackEntry.build(data, standings, date), logs }
 }
 
 // ─── 順位表フォールバックテーマ ──────────────────────────────────────
@@ -579,20 +879,50 @@ async function selectThemes(
   const themes: ArticleTheme[] = []
   const { date, games } = data
 
+  // タンキング・低勝率チームの事前サマリーログ
+  const tankCount = countKeywordArticles(['タンキング', 'tank', 'tanking'], recentArticles, 30)
+  const lowTeams = getLowWinPctTeamNames(standings, LOW_WIN_PCT_THRESHOLD)
+  const lowTeamCount = lowTeams.length > 0
+    ? countKeywordArticles(lowTeams, recentArticles, 7)
+    : 0
+  if (tankCount > 0) {
+    console.log(`  📊 タンキング記事: 直近30日 ${tankCount}件（上限: 月2件）`)
+  }
+  if (lowTeamCount > 0) {
+    console.log(`  📊 下位チーム記事: 直近7日 ${lowTeamCount}件（上限: 週1件）`)
+  }
+
   // テーマ1: ドラマ型
-  const dramaTheme = buildDramaTheme(games, date)
-  if (dramaTheme) themes.push(dramaTheme)
+  console.log('\n[テーマ1: ドラマ型 選定中]')
+  const dramaTheme = buildDramaTheme(games, date, recentArticles)
+  if (dramaTheme) {
+    themes.push(dramaTheme)
+    console.log(`  選択: 🎭 ${dramaTheme.title}`)
+  }
 
   // テーマ2: 論争型
+  console.log('\n[テーマ2: 論争型 選定中]')
   const debateTheme = buildDebateTheme(data, standings, recentArticles, date)
-  if (debateTheme) themes.push(debateTheme)
+  if (debateTheme) {
+    themes.push(debateTheme)
+    console.log(`  選択: 💬 ${debateTheme.title}`)
+  }
 
-  // テーマ3: カルチャー型
-  themes.push(buildCultureTheme(data, standings, date))
+  // テーマ3: ローテーション型（曜日別）
+  console.log('\n[テーマ3: ローテーション型 選定中]')
+  const { theme: rotationTheme, logs: rotationLogs } = buildRotationTheme(
+    data,
+    standings,
+    recentArticles,
+    date,
+  )
+  rotationLogs.forEach((log) => console.log(`  ${log}`))
+  themes.push(rotationTheme)
+  console.log(`  選択: 🏛️ ${rotationTheme.title}`)
 
   // フォールバック: standings テーマで補完
   if (themes.length < ARTICLE_COUNT && standings) {
-    console.log('  ℹ️  テーマ不足 → standings.json からテーマを補完します')
+    console.log('\n  ℹ️  テーマ不足 → standings.json からテーマを補完します')
     const fills = standingsThemes(standings, date)
     for (const t of fills) {
       if (themes.length >= ARTICLE_COUNT) break
@@ -735,8 +1065,8 @@ export async function run() {
     }
   }
 
-  // 直近記事取得（重複チェック用）
-  process.stdout.write('直近記事チェック中（Supabase）...')
+  // 直近記事取得（重複チェック用、14日間）
+  process.stdout.write('直近記事チェック中（Supabase, 14日間）...')
   const recentArticles = await fetchRecentArticles()
   console.log(` ${recentArticles.length}件`)
 
@@ -744,7 +1074,7 @@ export async function run() {
   const themes = await selectThemes(nbaData, standings, playerStats, recentArticles)
   console.log(`\nテーマ選定: ${themes.length}本`)
   themes.forEach((t, i) => {
-    const typeLabel = i === 0 ? '🎭 ドラマ' : i === 1 ? '💬 論争' : '🏛️ カルチャー'
+    const typeLabel = i === 0 ? '🎭 ドラマ' : i === 1 ? '💬 論争' : '🏛️ ローテーション'
     console.log(`  [${i + 1}] ${typeLabel}: ${t.title}${t.hasRealData ? ' 📊' : ''}`)
   })
 
