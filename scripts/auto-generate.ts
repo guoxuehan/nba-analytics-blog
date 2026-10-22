@@ -24,6 +24,33 @@ const MAX_TOKENS = 32000
 const EFFORT = 'medium' as const
 // 校正（誤り修正・AIっぽさの除去）に使うモデル
 const PROOFREAD_MODEL = 'claude-opus-5-5'
+
+// ─── API利用料の記録 ──────────────────────────────────────────────────
+// 1Mトークンあたりのドル（入力 / 出力）。料金改定時はここを更新する
+const PRICES: Record<string, { input: number; output: number }> = {
+  'claude-sonnet-5-5': { input: 2, output: 10 },
+  'claude-opus-5-5': { input: 4, output: 20 },
+}
+const usageTotals: Record<string, { input: number; output: number }> = {}
+
+function recordUsage(model: string, usage: Anthropic.Usage): void {
+  const t = (usageTotals[model] ??= { input: 0, output: 0 })
+  t.input += usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
+  t.output += usage.output_tokens
+}
+
+function logUsageSummary(): void {
+  let total = 0
+  console.log('  API利用量:')
+  for (const [model, t] of Object.entries(usageTotals)) {
+    const price = PRICES[model]
+    const cost = price ? (t.input * price.input + t.output * price.output) / 1_000_000 : 0
+    total += cost
+    console.log(`    ${model}: 入力 ${t.input.toLocaleString()} / 出力 ${t.output.toLocaleString()} トークン ≈ $${cost.toFixed(3)}`)
+  }
+  console.log(`    合計 ≈ $${total.toFixed(3)}（この実行分）`)
+}
+// 1回の実行で作る本数（実測: 生成+校正で1本あたり約0.14ドル。1日1回×3本で月12〜13ドル）
 const ARTICLE_COUNT = 3
 const LOW_WIN_PCT_THRESHOLD = 0.300
 
@@ -1055,6 +1082,7 @@ async function generateArticle(
     console.log(' 完了')
 
     const final = await stream.finalMessage()
+    recordUsage(MODEL, final.usage)
     if (final.stop_reason === 'refusal') {
       console.warn('  ⚠️  モデルが生成を断りました。スキップします。')
       return null
@@ -1115,7 +1143,7 @@ const PROOFREAD_RULES = `
 - 一文は50文字程度までを目安に、長すぎる文は分ける。
 
 【4. 変えてはいけないこと】
-- 出力フォーマット（---METADATA--- / ---BODY--- / ---XPOST--- の区切りと各項目）はそのまま保つ。
+- 出力フォーマット（---METADATA--- / ---BODY--- の区切りと各項目）はそのまま保つ。
 - slug は一文字も変えない。category も変えない。
 - 記事の主張・構成・見出しの数は大きく変えない。本文は2,000〜3,000文字を保つ。
 - title は30〜40文字、excerpt は100〜150文字、tags は5〜7個を保つ。
@@ -1143,6 +1171,9 @@ async function proofreadArticle(
   theme: ArticleTheme,
 ): Promise<string> {
   process.stdout.write('  校正中（Opus）')
+  // X投稿文はサイトに載らないため校正対象から外し、出力トークン（費用）を抑える
+  const xpostBlock = draft.match(/---XPOST---[\s\S]*?---XPOST---/)?.[0] ?? ''
+  const article = xpostBlock ? draft.replace(xpostBlock, '').trim() : draft
   try {
     const stream = client.messages.stream({
       model: PROOFREAD_MODEL,
@@ -1154,12 +1185,13 @@ async function proofreadArticle(
           role: 'user',
           content:
             `【執筆時の指示と元データ】\n${theme.prompt}\n\n` +
-            `【原稿】\n${draft}`,
+            `【原稿】\n${article}`,
         },
       ],
     })
     stream.on('text', () => process.stdout.write('.'))
     const final = await stream.finalMessage()
+    recordUsage(PROOFREAD_MODEL, final.usage)
     console.log(' 完了')
 
     if (final.stop_reason !== 'end_turn') {
@@ -1175,7 +1207,7 @@ async function proofreadArticle(
       console.warn(`  ⚠️  校正結果を採用しません（${problem}）。校正前の原稿を使います。`)
       return draft
     }
-    return revised + '\n'
+    return revised + (xpostBlock ? `\n${xpostBlock}` : '') + '\n'
   } catch (err) {
     console.log('')
     console.warn(`  ⚠️  校正に失敗しました（${err instanceof Error ? err.message : String(err)}）。校正前の原稿を使います。`)
@@ -1243,7 +1275,7 @@ export async function run() {
   const themes = await selectThemes(nbaData, standings, playerStats, recentArticles)
   console.log(`\nテーマ選定: ${themes.length}本`)
   themes.forEach((t, i) => {
-    const typeLabel = i === 0 ? '🎭 ドラマ' : i === 1 ? '💬 論争' : '🏛️ ローテーション'
+    const typeLabel = t.id === 'drama' ? '🎭 ドラマ' : t.id.startsWith('debate') ? '💬 論争' : '🏛️ ローテーション'
     console.log(`  [${i + 1}] ${typeLabel}: ${t.title}${t.hasRealData ? ' 📊' : ''}`)
   })
 
@@ -1259,6 +1291,7 @@ export async function run() {
 
   console.log('\n' + '━'.repeat(50))
   console.log(`  生成完了: ${succeeded}/${themes.length} 本`)
+  logUsageSummary()
   console.log('━'.repeat(50) + '\n')
 
   // 1本も生成できない場合は失敗として扱い、GitHub Actions で気づけるようにする
