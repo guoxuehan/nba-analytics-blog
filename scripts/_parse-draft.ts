@@ -40,8 +40,9 @@ function parseKeyValues(block: string): DraftMeta {
   for (const line of block.split('\n')) {
     const colonIdx = line.indexOf(':')
     if (colonIdx === -1) continue
-    const key = line.slice(0, colonIdx).trim()
-    const value = line.slice(colonIdx + 1).trim()
+    // 「**slug:** xxx」「slug: `xxx`」のような書式の揺れを取り除く
+    const key = line.slice(0, colonIdx).replace(/[*`]/g, '').trim()
+    const value = line.slice(colonIdx + 1).trim().replace(/^\*+\s*|\s*\*+$/g, '').replace(/^`|`$/g, '')
 
     if (key === 'tags') {
       // "tag1, tag2" or '["tag1","tag2"]' どちらにも対応

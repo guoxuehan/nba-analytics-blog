@@ -38,13 +38,20 @@ export async function POST(request: Request) {
 
   try {
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2500,
+      model: 'claude-sonnet-5-5',
+      // 思考(thinking)の分もトークンを使うため余裕を持たせる
+      max_tokens: 10000,
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const content =
-      message.content[0].type === 'text' ? message.content[0].text : ''
+    if (message.stop_reason === 'refusal') {
+      return Response.json({ error: 'AIが生成を断りました。テーマを変えて再度お試しください。' }, { status: 422 })
+    }
+
+    // 先頭に thinking ブロックが入るため、本文(text)ブロックだけをつなげる
+    const content = message.content
+      .map((b) => (b.type === 'text' ? b.text : ''))
+      .join('')
 
     return Response.json({ content })
   } catch (e) {

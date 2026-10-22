@@ -60,8 +60,9 @@ async function main() {
   const client = new Anthropic({ apiKey })
 
   const stream = client.messages.stream({
-    model: 'claude-opus-4-6',
-    max_tokens: 4096,
+    model: 'claude-opus-5-5',
+    // 思考(thinking)の分もトークンを使うため余裕を持たせる
+    max_tokens: 16000,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -81,8 +82,14 @@ async function main() {
   const response = await stream.finalMessage()
   console.log('\n')
 
-  const text = response.content[0]
-  if (text.type !== 'text') {
+  if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') {
+    console.error(`❌ 記事を最後まで生成できませんでした（stop_reason: ${response.stop_reason}）`)
+    process.exit(1)
+  }
+
+  // 先頭に thinking ブロックが入るため、本文(text)ブロックを探して取り出す
+  const text = response.content.find((b) => b.type === 'text')
+  if (!text || text.type !== 'text') {
     console.error('予期しないレスポンス形式です')
     process.exit(1)
   }

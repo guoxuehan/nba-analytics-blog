@@ -17,9 +17,20 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
 const DATA_DIR = path.resolve(process.cwd(), 'data')
 const DRAFT_DIR = path.resolve(process.cwd(), 'articles-draft')
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-5-5'
+// 新モデルは思考(thinking)が常にオンで、その分もトークンを使うため余裕を持たせる
+const MAX_TOKENS = 32000
+// 思考の深さ。high だと思考だけで上限を使い切ることがあったため medium にする
+const EFFORT = 'medium' as const
 const ARTICLE_COUNT = 3
 const LOW_WIN_PCT_THRESHOLD = 0.300
+
+/** 現在のシーズン表記（例: 2026-27）。10月始まりで切り替える */
+function currentSeasonLabel(): string {
+  const now = new Date()
+  const startYear = now.getMonth() + 1 >= 10 ? now.getFullYear() : now.getFullYear() - 1
+  return `${startYear}-${String(startYear + 1).slice(2)}`
+}
 
 type ArticleTheme = {
   id: string
@@ -233,17 +244,39 @@ function countKeywordArticles(
 }
 
 /** 勝率が threshold 以下のチーム名一覧を返す */
+/** 開幕直後は試合数が少なく、勝率や順位がまだ意味を持たない */
+const MIN_GAMES_FOR_STANDINGS = 10
+
+function isEarlySeason(standings: StandingsData): boolean {
+  const maxGames = Math.max(0, ...[...standings.east, ...standings.west].map((t) => t.wins + t.losses))
+  return maxGames < MIN_GAMES_FOR_STANDINGS
+}
+
 function getLowWinPctTeamNames(
   standings: StandingsData | null,
   threshold: number,
 ): string[] {
-  if (!standings) return []
+  if (!standings || isEarlySeason(standings)) return []
   return [...standings.east, ...standings.west]
     .filter((t) => t.winPct <= threshold)
     .map((t) => `${t.teamCity} ${t.teamName}`)
 }
 
 // ─── 選手スタッツのフォーマット ──────────────────────────────────────
+
+/** 勝者の得点を先にしたスコア（例: 131-106）。ホーム/アウェイ順だと勝敗を取り違えやすい */
+function winScore(g: GameSummary): string {
+  const homeWon = g.winner === g.homeTeam
+  return homeWon ? `${g.homeScore}-${g.awayScore}` : `${g.awayScore}-${g.homeScore}`
+}
+
+/** 勝敗が誤読されない試合結果の文（例: Minnesota Timberwolves（アウェイ）がMiami Heat（ホーム）に131-106で勝利） */
+function resultText(g: GameSummary): string {
+  const homeWon = g.winner === g.homeTeam
+  const winner = homeWon ? `${g.homeTeam}（ホーム）` : `${g.awayTeam}（アウェイ）`
+  const loser = homeWon ? `${g.awayTeam}（アウェイ）` : `${g.homeTeam}（ホーム）`
+  return `${winner}が${loser}に${winScore(g)}で勝利`
+}
 
 function formatLeaders(
   leaders: { home: GameLeader[]; away: GameLeader[] } | undefined,
@@ -324,14 +357,13 @@ function buildDramaTheme(
   for (const milestoneHero of heroes.filter((h) => h.pts >= 38)) {
     const g = milestoneHero.game
     if (isTeamBlocked(g.homeTeam, g.awayTeam)) continue
-    const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
     const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     return {
       id: 'drama',
       title: `${milestoneHero.player} ${milestoneHero.pts}点の夜`,
       hasRealData: true,
       prompt:
-        `${date}のNBA、${g.winner} vs ${loser}（${g.homeScore}-${g.awayScore}）。` +
+        `${date}のNBA、${resultText(g)}。` +
         `${milestoneHero.player}が${milestoneHero.pts}得点を記録しました。` +
         leadersText +
         `\n\nこの数字の「意味」を書け。` +
@@ -366,14 +398,13 @@ function buildDramaTheme(
   for (const topHero of heroes.filter((h) => h.pts >= 35)) {
     const g = topHero.game
     if (isTeamBlocked(g.homeTeam, g.awayTeam)) continue
-    const loser = g.homeTeam === g.winner ? g.awayTeam : g.homeTeam
     const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     return {
       id: 'drama',
       title: `${topHero.player}の${topHero.pts}点`,
       hasRealData: true,
       prompt:
-        `${date}のNBA、${g.winner} vs ${loser}（${g.homeScore}-${g.awayScore}）。` +
+        `${date}のNBA、${resultText(g)}。` +
         `${topHero.player}が${topHero.pts}得点を記録しました。` +
         leadersText +
         `\n\nこの夜の「異常さ」を書け。` +
@@ -390,10 +421,10 @@ function buildDramaTheme(
     const leadersText = formatLeaders(g.leaders, g.homeTeam, g.awayTeam)
     return {
       id: 'drama',
-      title: `${g.winner}が${g.homeScore}-${g.awayScore}の死闘を制す`,
+      title: `${g.winner}が${winScore(g)}の死闘を制す`,
       hasRealData: true,
       prompt:
-        `${date}のNBA、${g.winner}が${loser}を${g.homeScore}-${g.awayScore}（${g.scoreDiff}点差）で下しました。` +
+        `${date}のNBA、${g.winner}が${loser}を${winScore(g)}（${g.scoreDiff}点差）で下しました。` +
         leadersText +
         `\n\nこの試合の「緊張の中身」を書け。` +
         `点差ではなく、勝者と敗者を分けた1つの決断・1つのプレー・1人の判断を特定し、` +
@@ -411,7 +442,7 @@ function buildDramaTheme(
     title: `${bigWin.winner}が${loser}を圧倒した夜`,
     hasRealData: true,
     prompt:
-      `${date}のNBA、${bigWin.winner}が${loser}を${bigWin.homeScore}-${bigWin.awayScore}（${bigWin.scoreDiff}点差）で下しました。` +
+      `${date}のNBA、${bigWin.winner}が${loser}を${winScore(bigWin)}（${bigWin.scoreDiff}点差）で下しました。` +
       leadersText +
       `\n\nこの勝利の「本質」を書け。` +
       `スコアの背後に何があったのか、この試合が両チームのシーズンにどんな意味を持つのかを、` +
@@ -471,10 +502,10 @@ function buildDebateTheme(
         // 論争の切り口を自動生成
         const won = game.winner === teamName
         const debateAngle = playerFocus
-          ? `${playerFocus}は今季MVP候補に入るべきか？昨夜の${game.homeScore}-${game.awayScore}というスコアを起点に論じてください。`
+          ? `${playerFocus}は今季MVP候補に入るべきか？昨夜の試合（${resultText(game)}）を起点に論じてください。`
           : won
           ? `${teamName}は本当に優勝候補か？昨夜の勝利で強さを見せたが、プレーオフで崩れる可能性を含めて論じてください。`
-          : `${teamName}はこのまま沈むのか？昨夜の${game.homeScore}-${game.awayScore}の敗北が示すチームの本質的な問題を論じてください。`
+          : `${teamName}はこのまま沈むのか？昨夜の敗北（${resultText(game)}）が示すチームの本質的な問題を論じてください。`
 
         candidates.push({ game, team: teamName, teamAbbr: abbr, priority, playerFocus, debateAngle })
       }
@@ -499,7 +530,7 @@ function buildDebateTheme(
             teamAbbr,
             priority: 2,
             playerFocus: player.ja,
-            debateAngle: `${player.ja}は今何者か？昨夜の${game.homeScore}-${game.awayScore}を踏まえ、この選手の現在地と可能性を論争的な視点で論じてください。`,
+            debateAngle: `${player.ja}は今何者か？昨夜の試合（${resultText(game)}）を踏まえ、この選手の現在地と可能性を論争的な視点で論じてください。`,
           })
           break
         }
@@ -518,7 +549,7 @@ function buildDebateTheme(
       : ''
 
     const matchContext = best.game
-      ? `${date}のNBA、${best.game.winner}が${loser}を${best.game.homeScore}-${best.game.awayScore}で下しました。${leadersText}\n\n`
+      ? `${date}のNBA、${best.game.winner}が${loser}を${winScore(best.game)}で下しました。${leadersText}\n\n`
       : `${date}時点のNBAシーズン。\n\n`
 
     return {
@@ -549,11 +580,17 @@ function buildDebateTheme(
       if (!standTeam) continue
       const conf = standTeam.conference === 'East' ? '東' : '西'
       const winPctStr = (standTeam.winPct * 100).toFixed(1)
+      const early = isEarlySeason(standings)
       return {
         id: `debate-${teamDef.abbr.toLowerCase()}`,
-        title: `${teamDef.ja}は優勝できるか──勝率${winPctStr}%が語ること`,
+        title: early
+          ? `${teamDef.ja}は優勝できるか──開幕直後に問う本当の実力`
+          : `${teamDef.ja}は優勝できるか──勝率${winPctStr}%が語ること`,
         prompt:
           `${date}時点、${standTeam.teamCity} ${standTeam.teamName}は${standTeam.wins}勝${standTeam.losses}敗（勝率${winPctStr}%）で${conf}地区${standTeam.rank}位です。\n\n` +
+          (early
+            ? `※ シーズン開幕直後で試合数が少ないため、勝率や順位を論拠の中心にしないこと。昨季の実績とオフシーズンの補強を主な根拠にすること。\n\n`
+            : '') +
           `「このチームは本当に優勝候補か」という問いに答えてください。\n` +
           `楽観論と悲観論の両方を展開し、最後にコラムニストとして断言してください。` +
           `日本のNBAファンが最も注目するチームとして、ロスター構成・戦術・メンタリティの3軸で論じてください。`,
@@ -694,11 +731,25 @@ const ROTATION_SCHEDULE: RotationEntry[] = [
     keywords: ['ルーキー', '若手', 'ドラフト候補', '新人', '次世代'],
     slugPatterns: ['rookie', 'young-star', 'next-gen', 'draft-prospect'],
     dedupDays: 5,
-    build: (data, _standings, date) => {
+    build: (data, standings, date) => {
       const gamesSummary =
         data.games.length > 0
           ? data.games.map((g) => `${g.homeTeam} vs ${g.awayTeam}`).join(', ')
           : ''
+      // 開幕直後は「今季成長した」と言える材料がないため、ブレイク候補の展望にする
+      if (standings && isEarlySeason(standings)) {
+        return {
+          id: 'young-star',
+          title: `NBAの次世代──今季ブレイクを期待したい若手は誰か`,
+          prompt:
+            `${date}、NBAの${standings.season}シーズンが開幕したばかりです。\n\n` +
+            `今季ブレイクが期待される若手選手（25歳以下）を1人選び、その理由を論じよ。` +
+            `根拠は昨季までの歩みとプレースタイル、オフシーズンの環境変化に置くこと。` +
+            `今季の成績はまだ出ていないため、今季のスタッツや具体的な数字を作って書かないこと。` +
+            `「この選手はNBAのどんな問題を解決できるか」という視点で、将来像をコラムニストとして描け。` +
+            `日本のNBAファンが「この選手を追いかけたい」と思わせる切り口で書け。`,
+        }
+      }
       return {
         id: 'young-star',
         title: `NBAの次世代──今シーズン最も成長した若手は誰か`,
@@ -727,12 +778,15 @@ const ROTATION_SCHEDULE: RotationEntry[] = [
             `西: ${standings.west.slice(0, 4).map((t) => `${t.teamCity} ${t.teamName} (${t.wins}W)`).join(', ')}`,
           ].join('\n')
         : 'データなし'
+      const earlyNote = standings && isEarlySeason(standings)
+        ? '\n※ シーズン開幕直後のため、順位はまだ参考程度。昨季の実績とオフシーズンの補強を主な根拠にすること。\n'
+        : ''
       return {
         id: 'playoff-prediction',
         title: `プレーオフを制するのは誰か──3チームに絞る予想`,
         hasRealData: standings !== null,
         prompt:
-          `${date}時点のNBAプレーオフ展望。\n現在の順位（抜粋）:\n${standingsSummary}\n\n` +
+          `${date}時点のNBAプレーオフ展望。\n現在の順位（抜粋）:\n${standingsSummary}\n${earlyNote}\n` +
           `チャンピオンシップコンテンダーを3チームに絞り、それぞれの「勝つシナリオ」と` +
           `「崩れるシナリオ」を具体的に論じよ。` +
           `プレーオフの洗礼・負傷リスク・マッチアップの相性・ホームコートアドバンテージを考慮せよ。` +
@@ -826,6 +880,8 @@ function buildRotationTheme(
 
 function standingsThemes(standings: StandingsData, date: string): ArticleTheme[] {
   const themes: ArticleTheme[] = []
+  // 開幕直後に「1勝0敗で首位の理由」のような記事を作らない
+  if (isEarlySeason(standings)) return themes
   const { east, west } = standings
 
   const eastFirst = east[0]
@@ -931,12 +987,14 @@ async function selectThemes(
   }
 
   // 汎用フォールバック
+  const season = standings?.season ?? currentSeasonLabel()
   const fallbacks: ArticleTheme[] = [
     {
       id: 'mvp-race',
-      title: '2025-26 MVP候補5人に問う──あなたは誰を選ぶか',
+      title: `${season} MVP候補5人に問う──あなたは誰を選ぶか`,
       prompt:
-        '2025-26シーズンのNBA MVPレース上位候補を挙げ、それぞれの「MVP論拠」と「反論」を示してください。' +
+        `${season}シーズンのNBA MVPレース上位候補を挙げ、` +
+        'それぞれの「MVP論拠」と「反論」を示してください。' +
         '最後に1人に絞り、その理由をコラムニストとして断言すること。',
     },
     {
@@ -976,7 +1034,8 @@ async function generateArticle(
 
     const stream = client.messages.stream({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: MAX_TOKENS,
+      output_config: { effort: EFFORT },
       messages: [
         {
           role: 'user',
@@ -993,9 +1052,26 @@ async function generateArticle(
     }
     console.log(' 完了')
 
-    const slugMatch = content.match(/^slug:\s*([a-z0-9][a-z0-9-]*)/m)
+    const final = await stream.finalMessage()
+    if (final.stop_reason === 'refusal') {
+      console.warn('  ⚠️  モデルが生成を断りました。スキップします。')
+      return null
+    }
+    if (final.stop_reason === 'max_tokens') {
+      console.warn('  ⚠️  出力上限に達し記事が途中で切れました。スキップします。')
+      return null
+    }
+
+    // 「**slug:**」や「slug: `xxx`」のような軽い書式の揺れは許容する
+    const slugMatch = content.match(/^\s*\**slug\**:\s*\**[`"']?([a-z0-9][a-z0-9-]*)/m)
     if (!slugMatch) {
-      console.warn('  ⚠️  slugが見つかりません。スキップします。')
+      // 原因を後で確認できるよう、生の出力を残しておく（自動公開の対象外）
+      const reviewDir = path.join(DRAFT_DIR, 'needs-review')
+      if (!fs.existsSync(reviewDir)) fs.mkdirSync(reviewDir, { recursive: true })
+      const rawPath = path.join(reviewDir, `no-slug-${Date.now()}.md`)
+      fs.writeFileSync(rawPath, content, 'utf-8')
+      console.warn(`  ⚠️  slugが見つかりません。スキップします（出力: articles-draft/needs-review/${path.basename(rawPath)}）`)
+      console.warn(`     先頭: ${content.slice(0, 120).replace(/\n/g, '⏎')}`)
       return null
     }
 
@@ -1091,6 +1167,13 @@ export async function run() {
   console.log('\n' + '━'.repeat(50))
   console.log(`  生成完了: ${succeeded}/${themes.length} 本`)
   console.log('━'.repeat(50) + '\n')
+
+  // 1本も生成できない場合は失敗として扱い、GitHub Actions で気づけるようにする
+  // （モデル提供終了などで全件失敗しても「成功」扱いになっていたため）
+  if (themes.length > 0 && succeeded === 0) {
+    throw new Error(`記事を1本も生成できませんでした（0/${themes.length}本）`)
+  }
+  return { generated: succeeded, total: themes.length }
 }
 
 const isMain = process.argv[1]

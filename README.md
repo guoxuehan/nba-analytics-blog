@@ -11,9 +11,9 @@ NBA分析メディア。選手分析・チーム分析・戦術・データの4�
 | 言語 | TypeScript 5 |
 | データベース | Supabase (PostgreSQL) |
 | ホスティング | Vercel |
-| AI | Anthropic Claude API (`claude-sonnet-4-6`) |
+| AI | Anthropic Claude API（自動生成・管理画面: `claude-sonnet-5-5` / 手動生成: `claude-opus-5-5`） |
 | E2Eテスト | Playwright |
-| CIパイプライン | GitHub Actions (Node.js 20) |
+| CIパイプライン | GitHub Actions (Node.js 22) |
 
 ## ディレクトリ構成
 
@@ -63,7 +63,7 @@ nba-analytics-blog/
 
 ### 必要な環境
 
-- Node.js 20以上
+- Node.js 22以上
 - npm
 
 ### セットアップ手順

@@ -95,7 +95,7 @@ async function main() {
   }
   log('')
   log(
-    `  生成: 4本 / 公開: ${publishStats.published}本 / レビュー待ち: ${publishStats.needsReview}本`,
+    `  生成: ${generateStep.value?.generated ?? 0}本 / 公開: ${publishStats.published}本 / レビュー待ち: ${publishStats.needsReview}本`,
   )
   log(`  実行時間: ${elapsed}秒`)
   log(`  ログ保存先: logs/${today}.log`)
