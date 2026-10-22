@@ -22,6 +22,8 @@ const MODEL = 'claude-sonnet-5-5'
 const MAX_TOKENS = 32000
 // 思考の深さ。high だと思考だけで上限を使い切ることがあったため medium にする
 const EFFORT = 'medium' as const
+// 校正（誤り修正・AIっぽさの除去）に使うモデル
+const PROOFREAD_MODEL = 'claude-opus-5-5'
 const ARTICLE_COUNT = 3
 const LOW_WIN_PCT_THRESHOLD = 0.300
 
@@ -1081,12 +1083,103 @@ async function generateArticle(
       filepath = path.join(DRAFT_DIR, `${slug}-${Date.now()}.md`)
     }
 
+    content = await proofreadArticle(client, content, slug, theme)
+
     fs.writeFileSync(filepath, content, 'utf-8')
     console.log(`  ✅ 保存: articles-draft/${path.basename(filepath)}`)
     return filepath
   } catch (err) {
     console.error(`  ❌ 生成失敗: ${err instanceof Error ? err.message : String(err)}`)
     return null
+  }
+}
+
+// ─── 校正 ────────────────────────────────────────────────────────────
+
+const PROOFREAD_RULES = `
+あなたはスポーツ誌のベテラン校正者・編集者だ。
+渡されたNBA記事の原稿を校正し、校正後の原稿全文だけを出力せよ。前置きや説明は書かないこと。
+
+【1. 事実の確認】
+- 下の「執筆時の指示と元データ」と照らし合わせ、勝敗・スコア・得点・チーム名・選手名の誤りを直す。
+- 元データにない数字や発言を新しく書き足さない。根拠のない断定的な数字は、削るか表現を弱める。
+
+【2. AIっぽさをなくす】
+- 「〜ではない。〜だ。」の対比、短い体言止めの連発、修辞疑問の多用など、同じ型の繰り返しを減らす。
+- 「数字は嘘をつかない」「物語はここから始まる」のような決まり文句や、大げさな煽りを削る。
+- 段落ごとに同じ長さ・同じ構成が並ぶ機械的なリズムを崩し、人が書いたような自然な流れにする。
+- 次の語は使わない: と言っても過言ではない、言うまでもなく、非常に、まさに、改めて、ご存知、いわば
+
+【3. 日本語の校正】
+- 誤字脱字、表記ゆれ（選手名・チーム名のカタカナ表記を記事内で統一）、不自然な言い回しを直す。
+- 一文は50文字程度までを目安に、長すぎる文は分ける。
+
+【4. 変えてはいけないこと】
+- 出力フォーマット（---METADATA--- / ---BODY--- / ---XPOST--- の区切りと各項目）はそのまま保つ。
+- slug は一文字も変えない。category も変えない。
+- 記事の主張・構成・見出しの数は大きく変えない。本文は2,000〜3,000文字を保つ。
+- title は30〜40文字、excerpt は100〜150文字、tags は5〜7個を保つ。
+`.trim()
+
+/** 校正後の原稿が壊れていないか確かめる。問題があれば理由を返す */
+function validateProofread(revised: string, slug: string): string | null {
+  const meta = revised.match(/---METADATA---\r?\n([\s\S]*?)\r?\n---METADATA---/)
+  const body = revised.match(/---BODY---\r?\n([\s\S]*?)\r?\n---BODY---/)
+  if (!meta || !body) return 'METADATA/BODY の区切りが崩れている'
+  const slugMatch = meta[1].match(/^\s*\**slug\**:\s*\**[`"']?([a-z0-9][a-z0-9-]*)/m)
+  if (!slugMatch || slugMatch[1] !== slug) return 'slug が変わっている'
+  if (body[1].trim().length < 1800) return `本文が短すぎる（${body[1].trim().length}文字）`
+  return null
+}
+
+/**
+ * Opus で校正する。失敗した場合や原稿が壊れた場合は、元の原稿をそのまま返す
+ * （校正の失敗で記事の生成・公開まで止めないため）
+ */
+async function proofreadArticle(
+  client: Anthropic,
+  draft: string,
+  slug: string,
+  theme: ArticleTheme,
+): Promise<string> {
+  process.stdout.write('  校正中（Opus）')
+  try {
+    const stream = client.messages.stream({
+      model: PROOFREAD_MODEL,
+      max_tokens: MAX_TOKENS,
+      output_config: { effort: EFFORT },
+      system: PROOFREAD_RULES,
+      messages: [
+        {
+          role: 'user',
+          content:
+            `【執筆時の指示と元データ】\n${theme.prompt}\n\n` +
+            `【原稿】\n${draft}`,
+        },
+      ],
+    })
+    stream.on('text', () => process.stdout.write('.'))
+    const final = await stream.finalMessage()
+    console.log(' 完了')
+
+    if (final.stop_reason !== 'end_turn') {
+      console.warn(`  ⚠️  校正が完了しませんでした（${final.stop_reason}）。校正前の原稿を使います。`)
+      return draft
+    }
+    const revised = final.content
+      .map((b) => (b.type === 'text' ? b.text : ''))
+      .join('')
+      .trim()
+    const problem = validateProofread(revised, slug)
+    if (problem) {
+      console.warn(`  ⚠️  校正結果を採用しません（${problem}）。校正前の原稿を使います。`)
+      return draft
+    }
+    return revised + '\n'
+  } catch (err) {
+    console.log('')
+    console.warn(`  ⚠️  校正に失敗しました（${err instanceof Error ? err.message : String(err)}）。校正前の原稿を使います。`)
+    return draft
   }
 }
 
