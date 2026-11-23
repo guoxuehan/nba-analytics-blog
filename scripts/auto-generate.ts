@@ -17,11 +17,11 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
 const DATA_DIR = path.resolve(process.cwd(), 'data')
 const DRAFT_DIR = path.resolve(process.cwd(), 'articles-draft')
-const MODEL = 'claude-sonnet-5-5'
+export const MODEL = 'claude-sonnet-5-5'
 // 新モデルは思考(thinking)が常にオンで、その分もトークンを使うため余裕を持たせる
-const MAX_TOKENS = 32000
+export const MAX_TOKENS = 32000
 // 思考の深さ。high だと思考だけで上限を使い切ることがあったため medium にする
-const EFFORT = 'medium' as const
+export const EFFORT = 'medium' as const
 // 校正（誤り修正・AIっぽさの除去）に使うモデル
 const PROOFREAD_MODEL = 'claude-opus-5-5'
 
@@ -33,13 +33,13 @@ const PRICES: Record<string, { input: number; output: number }> = {
 }
 const usageTotals: Record<string, { input: number; output: number }> = {}
 
-function recordUsage(model: string, usage: Anthropic.Usage): void {
+export function recordUsage(model: string, usage: Anthropic.Usage): void {
   const t = (usageTotals[model] ??= { input: 0, output: 0 })
   t.input += usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
   t.output += usage.output_tokens
 }
 
-function logUsageSummary(): void {
+export function logUsageSummary(): void {
   let total = 0
   console.log('  API利用量:')
   for (const [model, t] of Object.entries(usageTotals)) {
@@ -55,13 +55,13 @@ const ARTICLE_COUNT = 3
 const LOW_WIN_PCT_THRESHOLD = 0.300
 
 /** 現在のシーズン表記（例: 2026-27）。10月始まりで切り替える */
-function currentSeasonLabel(): string {
+export function currentSeasonLabel(): string {
   const now = new Date()
   const startYear = now.getMonth() + 1 >= 10 ? now.getFullYear() : now.getFullYear() - 1
   return `${startYear}-${String(startYear + 1).slice(2)}`
 }
 
-type ArticleTheme = {
+export type ArticleTheme = {
   id: string
   title: string
   prompt: string
@@ -69,7 +69,7 @@ type ArticleTheme = {
 }
 
 // ─── プロンプトルール ─────────────────────────────────────────────────
-const ARTICLE_RULES = `
+export const ARTICLE_RULES = `
 あなたはESPNやThe Ringerのベテランコラムニストだ。
 試合結果を要約するレポーターではない。
 
@@ -154,7 +154,7 @@ X投稿文：
 `.trim()
 
 // ─── 実データ使用指示（ゲームデータあり記事のみ付与）─────────────────
-const REAL_DATA_INSTRUCTION = `
+export const REAL_DATA_INSTRUCTION = `
 【データ利用規則・厳守】
 以下のデータは本日取得した最新の実測値です。
 このデータのみを使用し、推定値・予測値は絶対に使わないこと。
@@ -184,14 +184,14 @@ const JAPAN_INTEREST_PLAYERS: { en: string; ja: string }[] = [
 
 // ─── 直近記事（重複チェック用）────────────────────────────────────────
 
-type RecentArticle = {
+export type RecentArticle = {
   slug: string
   title: string
   tags: string[]
   published_at: string | null
 }
 
-async function fetchRecentArticles(): Promise<RecentArticle[]> {
+export async function fetchRecentArticles(): Promise<RecentArticle[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseKey) return []
@@ -276,7 +276,7 @@ function countKeywordArticles(
 /** 開幕直後は試合数が少なく、勝率や順位がまだ意味を持たない */
 const MIN_GAMES_FOR_STANDINGS = 10
 
-function isEarlySeason(standings: StandingsData): boolean {
+export function isEarlySeason(standings: StandingsData): boolean {
   const maxGames = Math.max(0, ...[...standings.east, ...standings.west].map((t) => t.wins + t.losses))
   return maxGames < MIN_GAMES_FOR_STANDINGS
 }
@@ -294,20 +294,20 @@ function getLowWinPctTeamNames(
 // ─── 選手スタッツのフォーマット ──────────────────────────────────────
 
 /** 勝者の得点を先にしたスコア（例: 131-106）。ホーム/アウェイ順だと勝敗を取り違えやすい */
-function winScore(g: GameSummary): string {
+export function winScore(g: GameSummary): string {
   const homeWon = g.winner === g.homeTeam
   return homeWon ? `${g.homeScore}-${g.awayScore}` : `${g.awayScore}-${g.homeScore}`
 }
 
 /** 勝敗が誤読されない試合結果の文（例: Minnesota Timberwolves（アウェイ）がMiami Heat（ホーム）に131-106で勝利） */
-function resultText(g: GameSummary): string {
+export function resultText(g: GameSummary): string {
   const homeWon = g.winner === g.homeTeam
   const winner = homeWon ? `${g.homeTeam}（ホーム）` : `${g.awayTeam}（アウェイ）`
   const loser = homeWon ? `${g.awayTeam}（アウェイ）` : `${g.homeTeam}（ホーム）`
   return `${winner}が${loser}に${winScore(g)}で勝利`
 }
 
-function formatLeaders(
+export function formatLeaders(
   leaders: { home: GameLeader[]; away: GameLeader[] } | undefined,
   homeTeam: string,
   awayTeam: string,
@@ -332,13 +332,13 @@ function formatLeaders(
 
 // ─── standings.json の読み込み ────────────────────────────────────────
 
-type StandingsData = {
+export type StandingsData = {
   season: string
   east: NBAStandingTeam[]
   west: NBAStandingTeam[]
 }
 
-function loadStandings(): StandingsData | null {
+export function loadStandings(): StandingsData | null {
   const p = path.join(DATA_DIR, 'standings.json')
   if (!fs.existsSync(p)) return null
   try {
@@ -955,7 +955,7 @@ function standingsThemes(standings: StandingsData, date: string): ArticleTheme[]
 
 // ─── テーマ選定（3本） ────────────────────────────────────────────────
 
-async function selectThemes(
+export async function selectThemes(
   data: NBALatestData,
   standings: StandingsData | null,
   _playerStats: PlayerGameStat[],

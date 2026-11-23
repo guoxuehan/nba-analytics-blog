@@ -126,6 +126,19 @@ npm run check
 
 E2EテストはChromiumを使用する。初回は `npx playwright install chromium` が必要。
 
+## 編集部（AIエージェントによる記事制作）
+
+記者 → 編集長 → ライター → 校閲デスク → 公開 → マーケ担当の流れを、GitHub の Issue・PR・Actions 上で自動で回している。企画は Issue、入稿は PR、公開はマージで行う。
+
+| 段階 | ワークフロー | 成果物 |
+|---|---|---|
+| 朝会（記者・編集長） | `newsroom-daily.yml`（毎日 JST 18:00） | 企画 Issue（`企画:候補` → `企画:採用` / `企画:不採用`） |
+| 執筆（ライター） | `newsroom-write.yml` | 記事PR（`content/articles/`） |
+| 校閲（校閲デスク・デスク判定） | `newsroom-review.yml` | 修正コミット、レポート、自動マージ |
+| 公開（マーケ担当） | `newsroom-publish.yml` | Supabase への反映、配信 Issue |
+
+組織図・社長ができる操作・初期設定は [docs/newsroom.md](docs/newsroom.md) を参照。
+
 ## Claude Codeカスタムコマンド
 
 `.claude/commands/` に定義したコマンドを Claude Code から呼び出せる。

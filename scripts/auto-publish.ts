@@ -19,7 +19,7 @@ const DRAFT_DIR = path.resolve(process.cwd(), 'articles-draft')
 const NEEDS_REVIEW_DIR = path.join(DRAFT_DIR, 'needs-review')
 const XPOSTS_DIR = path.join(DRAFT_DIR, 'x-posts')
 
-const VALID_CATEGORIES = ['player_analysis', 'team_analysis', 'tactics', 'data']
+export const VALID_CATEGORIES = ['player_analysis', 'team_analysis', 'tactics', 'data']
 
 // quality-check.ts と同じ禁止ワード
 const BANNED_WORDS = [
@@ -33,7 +33,7 @@ const BANNED_WORDS = [
 ]
 
 // ─── 品質スコア計算（quality-check.ts と同じロジック）────────────────
-function computeScore(filepath: string): number {
+export function computeScore(filepath: string): number {
   const content = fs.readFileSync(filepath, 'utf-8')
   const parsed = parseDraft(content)
   if (!parsed) return 0

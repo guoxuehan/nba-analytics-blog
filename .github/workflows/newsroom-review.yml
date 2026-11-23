@@ -1,0 +1,127 @@
+name: "編集部: 校閲デスク（ファクトチェック・校正 → デスク判定）"
+
+# 起動のされ方:
+#   - ライター（newsroom-write.yml）が入稿したとき（workflow_dispatch）
+#   - 人間が記事PRを作ったとき（下書きPRは対象外）
+#   - Actions 画面から PR 番号を指定して手動で再校閲するとき
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: '記事PRの番号'
+        required: true
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    paths:
+      - 'content/articles/**'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write # 公開ワークフローを起動するため
+  id-token: write
+
+jobs:
+  review:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: newsroom-review-${{ inputs.pr || github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      PR: ${{ inputs.pr || github.event.pull_request.number }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      QUALITY_THRESHOLD: ${{ vars.QUALITY_THRESHOLD || '70' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: 記事PRをチェックアウト
+        id: find
+        run: |
+          if [ "$(gh pr view "$PR" --json state -q .state)" != "OPEN" ]; then
+            echo "PR #$PR はオープンではないため、スキップします"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          gh pr checkout "$PR"
+          FILE=$(gh pr diff "$PR" --name-only | grep -E '^content/articles/[a-z0-9-]+\.md$' | head -n1 || true)
+          if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
+            echo "記事ファイルが見つからないため、スキップします"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          SLUG=$(basename "$FILE" .md)
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "notes=content/notes/$SLUG.md" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 品質スコア（校閲前）
+        id: before
+        if: steps.find.outputs.skip != 'true'
+        run: npx tsx scripts/newsroom/score.ts "${{ steps.find.outputs.file }}"
+
+      - name: 🔍 校閲デスク（Claude Code）
+        id: desk
+        if: steps.find.outputs.skip != 'true'
+        continue-on-error: true # 失敗したら「人間の確認待ち」に回す
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            あなたは NBA COURT VISION の校閲デスクです。
+            まず職務記述書 .claude/agents/copy-desk.md を読み、それに従って作業してください。
+
+            - 対象の原稿: ${{ steps.find.outputs.file }}
+            - 取材メモ: ${{ steps.find.outputs.notes }}（存在しない場合は、一般に確認できる事実だけを根拠にする）
+
+            手順:
+            1. 職務記述書、原稿、取材メモを読む。
+            2. ファクトチェックと校正を行い、原稿ファイルを Edit ツールで直接修正する。編集してよいのは原稿ファイルだけ。
+            3. 判定（verdict）、要約（summary、2〜3文の日本語）、ファクトチェックで見つけた問題（fact_issues）、主な修正（edits）を返す。
+
+            git の操作や GitHub へのコメントはしないこと（後続のステップが行う）。
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 40
+            --allowedTools "Read,Edit,Glob,Grep"
+            --json-schema '{"type":"object","additionalProperties":false,"required":["verdict","summary","fact_issues","edits"],"properties":{"verdict":{"type":"string","enum":["pass","needs_human","reject"]},"summary":{"type":"string"},"fact_issues":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["claim","problem","action"],"properties":{"claim":{"type":"string"},"problem":{"type":"string"},"action":{"type":"string"}}}},"edits":{"type":"array","items":{"type":"string"}}}}'
+
+      - name: 校閲の修正をコミット
+        id: commit
+        if: steps.find.outputs.skip != 'true'
+        run: |
+          if [ -n "$(git status --porcelain content/articles/)" ]; then
+            git add content/articles/
+            git commit -m "校閲: $(basename "${{ steps.find.outputs.file }}" .md)"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 品質スコア（校閲後）
+        id: after
+        if: steps.find.outputs.skip != 'true'
+        run: npx tsx scripts/newsroom/score.ts "${{ steps.find.outputs.file }}"
+
+      - name: ✅ デスク判定（自動公開 or 人間へ）
+        if: steps.find.outputs.skip != 'true'
+        env:
+          FILE: ${{ steps.find.outputs.file }}
+          SCORE_BEFORE: ${{ steps.before.outputs.score }}
+          SCORE_AFTER: ${{ steps.after.outputs.score }}
+          DESK_RESULT: ${{ steps.desk.outputs.structured_output }}
+          DESK_OUTCOME: ${{ steps.desk.outcome }}
+          CHANGED: ${{ steps.commit.outputs.changed }}
+        run: npx tsx scripts/newsroom/review-gate.ts

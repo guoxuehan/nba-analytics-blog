@@ -1,9 +1,8 @@
-name: Auto Publish Articles
+name: "旧パイプライン（手動のみ）"
 
+# 編集部ワークフロー（newsroom-*.yml）に移行したため、定期実行は停止。
+# 緊急時に旧方式（PRを経由せず直接公開）で動かしたいときだけ手動で実行する。
 on:
-  schedule:
-    # 費用を抑えるため1日1回。米国の試合が終わった後の JST 18:00 に実行
-    - cron: '0 9 * * *'   # JST 18:00（UTC 09:00）
   workflow_dispatch:
 
 permissions:

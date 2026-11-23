@@ -1,0 +1,42 @@
+name: 記事企画の持ち込み
+description: 書いてほしい記事の企画を出す（翌日の朝会で編集長が審査します）
+title: "[企画] "
+labels: ["企画:候補"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        すぐ書かせたいときは、提出後に `企画:採用` ラベルを付けてください（編集長の審査を飛ばしてライターが執筆します）。
+  - type: dropdown
+    id: category
+    attributes:
+      label: カテゴリ
+      options:
+        - player_analysis
+        - team_analysis
+        - tactics
+        - data
+    validations:
+      required: true
+  - type: textarea
+    id: angle
+    attributes:
+      label: 切り口
+      description: 記事が立てる1つの問い。例「八村塁はレイカーズの先発に定着できるか」
+    validations:
+      required: true
+  - type: textarea
+    id: why_now
+    attributes:
+      label: なぜ今か
+  - type: textarea
+    id: brief
+    attributes:
+      label: ライターへの指示
+      description: 強調してほしい点、避けてほしい点、参考にしてほしい試合など
+  - type: textarea
+    id: data
+    attributes:
+      label: 取材データ
+      description: 記事で使ってよい数字や事実（1行に1つ）。ここに書いた数字だけが記事で使われ、校閲デスクの照合にも使われます
+      render: text
