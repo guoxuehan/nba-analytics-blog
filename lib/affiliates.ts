@@ -9,7 +9,7 @@
  */
 
 const AMAZON_ASSOCIATE_TAG = process.env.NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG || 'nbacourtvisio-22'
-const RAKUTEN_AFFILIATE_ID = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || ''
+const RAKUTEN_AFFILIATE_ID = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '59e51b29.e88e86e3.59e51b2a.8bc7dd81'
 
 /** `:::shop キーワード` の行 */
 export const SHOP_LINE = /^:::shop[ \t]+(.+?)[ \t]*$/gm
