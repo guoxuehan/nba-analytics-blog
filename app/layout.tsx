@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { Oswald, Source_Sans_3, Noto_Sans_JP } from 'next/font/google'
+import { Oswald, Noto_Sans_JP } from 'next/font/google'
+import localFont from 'next/font/local'
 import Script from 'next/script'
 import { Providers } from './providers'
 import { Header } from './components/Header'
@@ -16,9 +17,11 @@ const oswald = Oswald({
 })
 
 // 本文: エディトリアルな可読性重視
-const sourceSans = Source_Sans_3({
-  subsets: ['latin'],
-  weight: ['300', '400', '600', '700'],
+// Google Fonts から取得すると、CI 環境でビルドが失敗した
+// （"next/font/google queries have exactly one entry"）ため、可変フォント（latin, 300〜700）を同梱して読み込む
+const sourceSans = localFont({
+  src: './fonts/source-sans-3-latin.woff2',
+  weight: '300 700',
   variable: '--font-source-sans',
   display: 'swap',
 })
