@@ -26,7 +26,11 @@ jobs:
   review:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft)
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       !github.event.pull_request.draft &&
+       github.event.pull_request.user.type != 'Bot')
+    # ↑ ライターが作ったPR（ボット）は、ライターが workflow_dispatch で校閲を起動するので
+    #   pull_request イベントでは動かさない（二重校閲の防止）
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -78,6 +82,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # ライター（github-actions）が起動した校閲を受け付ける。既定ではボット起動の実行は拒否される
+          allowed_bots: 'github-actions,github-actions[bot]'
           prompt: |
             あなたは NBA COURT VISION の校閲デスクです。
             まず職務記述書 .claude/agents/copy-desk.md を読み、それに従って作業してください。
