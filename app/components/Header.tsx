@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { label: '戦術', href: '/category/tactics' },
   { label: 'データ', href: '/category/data' },
   { label: 'チーム', href: '/teams' },
+  { label: '選手', href: '/players' },
 ]
 
 // ─── アイコン（インライン SVG） ─────────────────────────────

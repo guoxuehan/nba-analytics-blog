@@ -18,6 +18,8 @@ export type Team = {
   short: string
   conference: Conference
   division: string
+  /** 表記ゆれのタグ（例: LAクリッパーズ） */
+  aliases?: string[]
 }
 
 const t = (
@@ -65,6 +67,20 @@ export const TEAMS: Team[] = [
   t('SAS', 'San Antonio Spurs', 'サンアントニオ・スパーズ', 'スパーズ', 'West', 'サウスウエスト', 'SA'),
 ]
 
+// 記事タグで実際に使われている表記ゆれ
+const ALIASES: Record<string, string[]> = {
+  LAC: ['LAクリッパーズ'],
+  GSW: ['ゴールデンステイト・ウォリアーズ'],
+  PHI: ['フィラデルフィア・セブンティシクサーズ', 'セブンティシクサーズ'],
+  POR: ['トレイルブレイザーズ'],
+}
+for (const team of TEAMS) team.aliases = ALIASES[team.abbr]
+
+/** タグがチーム名（表記ゆれを含む）なら、そのチームを返す */
+export function findTeamByTag(tag: string): Team | undefined {
+  return TEAMS.find((team) => team.ja === tag || team.aliases?.includes(tag))
+}
+
 export function getTeam(slug: string): Team | undefined {
   return TEAMS.find((team) => team.slug === slug)
 }
@@ -88,12 +104,12 @@ type ESPNEntry = {
 type ESPNStandings = { children?: { name: string; standings: { entries: ESPNEntry[] } }[] }
 
 /**
- * 現在の順位表を取る。6時間キャッシュし、取得できなければ空配列を返す（ページの表示は止めない）
+ * 現在の順位表を取る。1時間キャッシュし、取得できなければ空配列を返す（ページの表示は止めない）
  */
 export async function getStandings(): Promise<Standing[]> {
   try {
     const res = await fetch('https://site.api.espn.com/apis/v2/sports/basketball/nba/standings', {
-      next: { revalidate: 6 * 3600 },
+      next: { revalidate: 3600 },
     })
     if (!res.ok) return []
     const data = (await res.json()) as ESPNStandings
@@ -125,7 +141,12 @@ export async function getStandings(): Promise<Standing[]> {
 
 /** タグにチームの正式名がある記事、またはタイトルにチームの呼び名がある記事 */
 export function mentionsTeam(team: Team, post: { title: string; tags?: string[] | null }): boolean {
-  return (post.tags ?? []).includes(team.ja) || post.title.includes(team.short) || post.title.includes(team.ja)
+  const names = [team.ja, ...(team.aliases ?? [])]
+  return (
+    (post.tags ?? []).some((tag) => names.includes(tag)) ||
+    post.title.includes(team.short) ||
+    names.some((name) => post.title.includes(name))
+  )
 }
 
 /**
