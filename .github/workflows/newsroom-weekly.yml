@@ -21,6 +21,10 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      # GA4・Search Console（未設定なら、その部分を省いてレポートを作る）
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      GA4_PROPERTY_ID: ${{ vars.GA4_PROPERTY_ID }}
+      GSC_SITE_URL: ${{ vars.GSC_SITE_URL }}
     steps:
       - uses: actions/checkout@v4
 

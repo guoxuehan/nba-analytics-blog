@@ -12,6 +12,7 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { MODEL, logUsageSummary } from '../auto-generate'
+import { fetchAnalytics } from './analytics'
 import { LABELS, appendSummary, callJson, createIssue, ensureLabels, gh, ghJson, loadPersona, todayJST } from './_lib'
 
 const DAYS = 7
@@ -103,6 +104,29 @@ async function main() {
     `失敗したワークフロー: ${failedRuns.length}回${failedByWorkflow.length ? `（${failedByWorkflow.map((f) => `${f.name} ${f.count}回`).join('、')}）` : ''}`,
   ]
 
+  // ── GA4・Search Console（設定されていれば）──
+  const analytics = await fetchAnalytics()
+  const change = (cur: number, prev: number) =>
+    prev > 0 ? `（前週比 ${cur >= prev ? '+' : ''}${Math.round(((cur - prev) / prev) * 100)}%）` : ''
+  if (analytics?.ga) {
+    const g = analytics.ga
+    facts.push(
+      `ユーザー数（GA4）: ${g.users.toLocaleString()}人${change(g.users, g.usersPrev)}`,
+      `ページビュー（GA4）: ${g.pageViews.toLocaleString()}${change(g.pageViews, g.pageViewsPrev)}`,
+      `流入元（GA4・セッション）: ${g.channels.map((c) => `${c.name} ${c.sessions}`).join('、') || 'データなし'}`,
+    )
+  } else if (analytics?.gaError) {
+    facts.push(`GA4: 取得できず（${analytics.gaError}）`)
+  }
+  if (analytics?.gsc) {
+    const s = analytics.gsc
+    facts.push(
+      `検索（Search Console ${s.period}）: クリック ${s.clicks} / 表示 ${s.impressions} / CTR ${(s.ctr * 100).toFixed(1)}% / 平均掲載順位 ${s.position.toFixed(1)}`,
+    )
+  } else if (analytics?.gscError) {
+    facts.push(`Search Console: 取得できず（${analytics.gscError}）`)
+  }
+
   console.log('📊 経営企画: 集計\n' + facts.map((f) => `  ${f}`).join('\n'))
 
   const insight = await callJson<Insight>({
@@ -114,6 +138,18 @@ async function main() {
       '',
       '公開した記事:',
       ...(live.length ? live.map((a) => `- [${CATEGORY_LABELS[a.category] ?? a.category}] ${a.title}`) : ['（なし）']),
+      ...(analytics?.ga?.topPages.length
+        ? ['', 'よく読まれた記事（GA4・PV）:', ...analytics.ga.topPages.map((p) => `- ${p.title}: ${p.views}`)]
+        : []),
+      ...(analytics?.gsc?.topQueries.length
+        ? [
+            '',
+            '検索クエリ上位（Search Console）:',
+            ...analytics.gsc.topQueries.map(
+              (q) => `- ${q.query}: クリック ${q.clicks} / 表示 ${q.impressions} / 順位 ${q.position.toFixed(1)}`,
+            ),
+          ]
+        : []),
     ].join('\n'),
     schema: INSIGHT_SCHEMA,
     effort: 'low',
@@ -122,7 +158,7 @@ async function main() {
 
   const list = (items: string[]) => (items.length ? items.map((s) => `- ${s}`).join('\n') : '- 特になし')
   const body = [
-    '> 📊 経営企画担当が作成した週次レポートです。数字はすべて Supabase と GitHub の実データから集計しています。',
+    '> 📊 経営企画担当が作成した週次レポートです。数字はすべて Supabase・GitHub・GA4・Search Console の実データから集計しています。',
     '',
     '## 数字',
     '| 項目 | 値 |',
@@ -141,6 +177,26 @@ async function main() {
     '## 来週のアクション',
     list(insight.actions),
     '',
+    ...(analytics?.ga?.topPages.length
+      ? [
+          '## よく読まれた記事（GA4・今週）',
+          '| 記事 | PV |',
+          '|---|---|',
+          ...analytics.ga.topPages.map((p) => `| [${p.title.replace(/\|/g, '｜')}](https://sports-academia.com${p.path}) | ${p.views} |`),
+          '',
+        ]
+      : []),
+    ...(analytics?.gsc?.topQueries.length
+      ? [
+          `## 検索クエリ上位（Search Console ${analytics.gsc.period}）`,
+          '| クエリ | クリック | 表示 | 平均順位 |',
+          '|---|---|---|---|',
+          ...analytics.gsc.topQueries.map(
+            (q) => `| ${q.query.replace(/\|/g, '｜')} | ${q.clicks} | ${q.impressions} | ${q.position.toFixed(1)} |`,
+          ),
+          '',
+        ]
+      : []),
     ...(waitingHuman.length
       ? ['## 社長の確認待ち', ...waitingHuman.map((p) => `- #${p.number} ${p.title}`), '']
       : []),

@@ -84,7 +84,12 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
    **X 自動投稿**（任意・有料）: X の開発者コンソールで権限「Read and write」のアプリを作り、Secrets に `X_API_KEY`、`X_API_SECRET`、
    `X_ACCESS_TOKEN`、`X_ACCESS_TOKEN_SECRET` を登録する。URL付きの投稿は1件 約$0.20（2026年11月時点の公式料金表）。
    **Google ニュース**: 申請は不要。`/news-sitemap.xml`（直近2日の記事）を robots.txt で案内している。
-5. **Supabase**: 記事の修正を反映するには、`articles` テーブルに UPDATE を許可する RLS ポリシーが必要（INSERT は既存の運用で許可済み）。
+5. **GA4・Search Console**（週次レポートにアクセス数を入れる）: Google Cloud でサービスアカウントを作り、
+   「Google Analytics Data API」と「Google Search Console API」を有効にして JSON キーを発行する。
+   サービスアカウントのメールアドレスを、GA4 のプロパティに「閲覧者」、Search Console のプロパティに「制限付き」ユーザーとして追加する。
+   JSON キーを Secrets の `GOOGLE_SERVICE_ACCOUNT_JSON` に、GA4 のプロパティID（数字）を Variables の `GA4_PROPERTY_ID` に登録する。
+   Search Console がドメインプロパティなら、Variables の `GSC_SITE_URL` を `sc-domain:sports-academia.com` にする（既定は `https://sports-academia.com/`）。
+6. **Supabase**: 記事の修正を反映するには、`articles` テーブルに UPDATE を許可する RLS ポリシーが必要（INSERT は既存の運用で許可済み）。
 
 ## 設計上の注意
 
