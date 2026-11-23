@@ -19,6 +19,8 @@ export type AnalyticsReport = {
     pageViewsPrev: number
     channels: { name: string; sessions: number }[]
     topPages: { path: string; title: string; views: number }[]
+    /** 記事内の「関連商品を探す」リンクのクリック数（GA4 の affiliate_click イベント） */
+    affiliateClicks: number
   }
   gaError?: string
   gsc: null | {
@@ -87,7 +89,7 @@ async function fetchGa(token: string, propertyId: string, { days, top }: Options
       dateRanges: [dateRange],
       metrics: [{ name: 'activeUsers' }, { name: 'screenPageViews' }],
     })
-  const [cur, prev, channels, pages] = await Promise.all([
+  const [cur, prev, channels, pages, affiliate] = await Promise.all([
     totals(thisWeek),
     totals(lastWeek),
     googlePost<GaReport>(url, token, {
@@ -105,6 +107,12 @@ async function fetchGa(token: string, propertyId: string, { days, top }: Options
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
       limit: top,
     }),
+    googlePost<GaReport>(url, token, {
+      dateRanges: [thisWeek],
+      dimensions: [{ name: 'eventName' }],
+      metrics: [{ name: 'eventCount' }],
+      dimensionFilter: { filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: 'affiliate_click' } } },
+    }),
   ])
   const num = (r: GaReport, i: number) => Number(r.rows?.[0]?.metricValues[i]?.value ?? 0)
   return {
@@ -116,6 +124,7 @@ async function fetchGa(token: string, propertyId: string, { days, top }: Options
       name: r.dimensionValues![0].value,
       sessions: Number(r.metricValues[0].value),
     })),
+    affiliateClicks: num(affiliate, 0),
     topPages: (pages.rows ?? []).map((r) => ({
       path: r.dimensionValues![0].value,
       title: r.dimensionValues![1].value.replace(/\s*\|\s*NBA COURT VISION$/, ''),

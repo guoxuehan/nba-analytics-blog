@@ -23,6 +23,7 @@ tools: Read, Edit, Grep, Glob, WebSearch, WebFetch
 
 ## 3. 変えてはいけないこと
 - frontmatter の slug、category、issue は変えない。
+- 本文最後の `:::shop キーワード` の行（関連商品の枠）は残す。ただし、記事の内容と関係のないキーワードや、本文中の宣伝めいた表現は削除する。
 - 記事の主張と構成、見出しの数は大きく変えない。本文は2,000〜3,000字を保つ。
 - title は30〜40字、excerpt は100〜150字、tags は5〜7個を保つ。
 

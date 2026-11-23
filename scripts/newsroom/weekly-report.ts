@@ -16,6 +16,8 @@ import { fetchAnalytics } from './analytics'
 import { LABELS, appendSummary, callJson, createIssue, ensureLabels, gh, ghJson, loadPersona, todayJST } from './_lib'
 
 const DAYS = 7
+/** AdSense を申請する目安の月間PV（経営企画の方針。.claude/agents/strategist.md と合わせる） */
+const ADSENSE_PV_TARGET = 10_000
 const DRY_RUN = process.env.DRY_RUN === '1'
 const REPORT_LABEL = '経営:週次レポート'
 
@@ -129,6 +131,25 @@ async function main() {
   } else if (analytics?.gscError) {
     facts.push(`Search Console: 取得できず（${analytics.gscError}）`)
   }
+
+  // ── 収益化の指標（直近28日。月単位で見る）──
+  const monthly = analytics ? await fetchAnalytics({ days: 28, top: 1 }) : null
+  const monetization: string[] = []
+  if (monthly?.ga) {
+    const g = monthly.ga
+    const progress = Math.min(100, Math.round((g.pageViews / ADSENSE_PV_TARGET) * 100))
+    const pctChange =
+      g.pageViewsPrev > 0 ? `（前の28日比 ${g.pageViews >= g.pageViewsPrev ? '+' : ''}${Math.round(((g.pageViews - g.pageViewsPrev) / g.pageViewsPrev) * 100)}%）` : ''
+    monetization.push(
+      `月間PV（直近28日）: ${g.pageViews.toLocaleString()}${pctChange}`,
+      `AdSense 申請の目安（月${ADSENSE_PV_TARGET.toLocaleString()}PV）: ${progress}%`,
+      `アフィリエイトのクリック（直近28日）: ${g.affiliateClicks}回`,
+    )
+  }
+  if (monthly?.gsc) {
+    monetization.push(`検索の表示回数（Search Console ${monthly.gsc.period}）: ${monthly.gsc.impressions.toLocaleString()}回 / クリック ${monthly.gsc.clicks}`)
+  }
+  facts.push(...monetization)
 
   console.log('📊 経営企画: 集計\n' + facts.map((f) => `  ${f}`).join('\n'))
 
