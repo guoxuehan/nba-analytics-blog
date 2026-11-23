@@ -1,0 +1,54 @@
+name: "マーケ: X 自動投稿"
+
+# 毎時、公開時刻を過ぎた記事の配信Issueから X に投稿する。
+# X API のキー（Secrets）が未設定なら何もしない。
+on:
+  schedule:
+    - cron: '10 * * * *' # 毎時10分
+  workflow_dispatch:
+
+concurrency:
+  group: newsroom-social
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      X_API_KEY: ${{ secrets.X_API_KEY }}
+      X_API_SECRET: ${{ secrets.X_API_SECRET }}
+      X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+      X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+      X_DAILY_POST_LIMIT: ${{ vars.X_DAILY_POST_LIMIT || '1' }}
+    steps:
+      - name: キーが未設定なら終了
+        id: gate
+        run: |
+          if [ -z "$X_API_KEY" ] || [ -z "$X_ACCESS_TOKEN" ]; then
+            echo "X API のキーが未設定のため、スキップします"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+        if: steps.gate.outputs.skip != 'true'
+
+      - name: 📣 X に投稿
+        if: steps.gate.outputs.skip != 'true'
+        run: npx tsx scripts/newsroom/social.ts

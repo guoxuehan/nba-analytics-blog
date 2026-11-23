@@ -13,6 +13,7 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 | 🔍 校閲デスク | [.claude/agents/copy-desk.md](../.claude/agents/copy-desk.md) | claude-code-action（[newsroom-review.yml](../.github/workflows/newsroom-review.yml)） | 入稿されたとき | Claudeサブスク（Opus） |
 | ✅ デスク判定 | — | [scripts/newsroom/review-gate.ts](../scripts/newsroom/review-gate.ts) | 校閲の後 | 無料 |
 | 📣 マーケ担当 | [.claude/agents/marketer.md](../.claude/agents/marketer.md) | [scripts/newsroom/marketer.ts](../scripts/newsroom/marketer.ts) | 公開されたとき | API（Sonnet） |
+| 📣 投稿係 | — | [scripts/newsroom/social.ts](../scripts/newsroom/social.ts) | 毎時（公開時刻を過ぎた配信案） | X API（URL付き投稿 1件 約$0.20） |
 | 📊 経営企画 | [.claude/agents/strategist.md](../.claude/agents/strategist.md) | [scripts/newsroom/weekly-report.ts](../scripts/newsroom/weekly-report.ts) | 毎週月曜 JST 9:00 | API（Sonnet） |
 | 🤖 @claude | — | claude-code-action（[claude.yml](../.github/workflows/claude.yml)） | `@claude` とコメントしたとき | Claudeサブスク |
 
@@ -43,6 +44,10 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
   🚀 content/articles/ を Supabase に反映（新規は PUBLISH_INTERVAL_HOURS ずつ公開時刻をずらす）
   📣 マーケ担当: X投稿文3パターンを配信 Issue で起票   ラベル: マーケ:配信待ち
 
+[X 自動投稿 newsroom-social.yml / 毎時10分]
+  📣 投稿係: 公開時刻を過ぎた配信 Issue の「最初の投稿文」を X に投稿 → URL をコメントしてクローズ
+              ラベル: マーケ:配信済（1日 X_DAILY_POST_LIMIT 本まで。キー未設定なら何もしない）
+
 [週次レポート newsroom-weekly.yml / 毎週月曜 JST 9:00]
   📊 経営企画: 公開本数・カテゴリ内訳・企画の採用率・自動公開率・確認待ち・失敗したワークフローを集計し、
               所見と来週のアクションを Issue で報告                         ラベル: 経営:週次レポート
@@ -59,6 +64,8 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 | 確認待ちの記事を公開する | PR をマージする（マージで公開ワークフローが動く） |
 | 校閲をやり直す | Actions →「編集部: 校閲デスク」→ Run workflow に PR 番号を入れる |
 | 朝会を今すぐ開く | Actions →「編集部: 朝会」→ Run workflow |
+| X に投稿する文面を選ぶ | 配信 Issue の本文で、投稿したいパターンを一番上にする（書き換えも可） |
+| X に投稿させない | 配信 Issue から `マーケ:配信待ち` ラベルを外す |
 | 週次レポートを今すぐ作る | Actions →「経営企画: 週次レポート」→ Run workflow |
 | 記者の企画をローカルで試す | `DRY_RUN=1 npx tsx scripts/newsroom/reporter.ts`（GitHub を操作しない） |
 
@@ -71,7 +78,10 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 3. **Actions の権限**（Settings → Actions → General → Workflow permissions）
    - 「Read and write permissions」を選ぶ
    - 「Allow GitHub Actions to create and approve pull requests」にチェックを入れる
-4. **Supabase**: 記事の修正を反映するには、`articles` テーブルに UPDATE を許可する RLS ポリシーが必要（INSERT は既存の運用で許可済み）。
+4. **X 自動投稿**（任意）: X の開発者コンソールでアプリを作り、権限を「Read and write」にしてからアクセストークンを発行し、
+   Secrets に `X_API_KEY`、`X_API_SECRET`、`X_ACCESS_TOKEN`、`X_ACCESS_TOKEN_SECRET` を登録する。
+   X API は従量課金で、URL付きの投稿は1件 約$0.20（2026年11月時点の公式料金表）。1日の本数は Variables の `X_DAILY_POST_LIMIT`（既定1）で決める。
+5. **Supabase**: 記事の修正を反映するには、`articles` テーブルに UPDATE を許可する RLS ポリシーが必要（INSERT は既存の運用で許可済み）。
 
 ## 設計上の注意
 
