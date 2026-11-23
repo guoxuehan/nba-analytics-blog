@@ -76,10 +76,12 @@ async function googlePost<T>(url: string, token: string, body: object): Promise<
 // ─── GA4 ─────────────────────────────────────────────────────────────
 type GaReport = { rows?: { dimensionValues?: { value: string }[]; metricValues: { value: string }[] }[] }
 
-async function fetchGa(token: string, propertyId: string): Promise<NonNullable<AnalyticsReport['ga']>> {
+type Options = { days: number; top: number }
+
+async function fetchGa(token: string, propertyId: string, { days, top }: Options): Promise<NonNullable<AnalyticsReport['ga']>> {
   const url = `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`
-  const thisWeek = { startDate: '7daysAgo', endDate: 'yesterday' }
-  const lastWeek = { startDate: '14daysAgo', endDate: '8daysAgo' }
+  const thisWeek = { startDate: `${days}daysAgo`, endDate: 'yesterday' }
+  const lastWeek = { startDate: `${days * 2}daysAgo`, endDate: `${days + 1}daysAgo` }
   const totals = (dateRange: object) =>
     googlePost<GaReport>(url, token, {
       dateRanges: [dateRange],
@@ -101,7 +103,7 @@ async function fetchGa(token: string, propertyId: string): Promise<NonNullable<A
       metrics: [{ name: 'screenPageViews' }],
       dimensionFilter: { filter: { fieldName: 'pagePath', stringFilter: { matchType: 'BEGINS_WITH', value: '/articles/' } } },
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
-      limit: 5,
+      limit: top,
     }),
   ])
   const num = (r: GaReport, i: number) => Number(r.rows?.[0]?.metricValues[i]?.value ?? 0)
@@ -125,14 +127,14 @@ async function fetchGa(token: string, propertyId: string): Promise<NonNullable<A
 // ─── Search Console ──────────────────────────────────────────────────
 type GscResponse = { rows?: { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number }[] }
 
-async function fetchGsc(token: string, siteUrl: string): Promise<NonNullable<AnalyticsReport['gsc']>> {
-  // Search Console のデータは2〜3日遅れて確定するため、3日前までの7日間を見る
+async function fetchGsc(token: string, siteUrl: string, { days, top }: Options): Promise<NonNullable<AnalyticsReport['gsc']>> {
+  // Search Console のデータは2〜3日遅れて確定するため、3日前までの期間を見る
   const day = (offset: number) => new Date(Date.now() - offset * 86_400_000).toISOString().slice(0, 10)
-  const range = { startDate: day(9), endDate: day(3) }
+  const range = { startDate: day(days + 2), endDate: day(3) }
   const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`
   const [total, queries] = await Promise.all([
     googlePost<GscResponse>(url, token, { ...range }),
-    googlePost<GscResponse>(url, token, { ...range, dimensions: ['query'], rowLimit: 10 }),
+    googlePost<GscResponse>(url, token, { ...range, dimensions: ['query'], rowLimit: top * 2 }),
   ])
   const t = total.rows?.[0]
   return {
@@ -150,8 +152,13 @@ async function fetchGsc(token: string, siteUrl: string): Promise<NonNullable<Ana
   }
 }
 
-/** 認証情報がなければ null を返す */
-export async function fetchAnalytics(): Promise<AnalyticsReport | null> {
+/**
+ * 認証情報がなければ null を返す
+ * @param days 集計する日数（既定7日。GA4 は前の同じ日数と比べる）
+ * @param top  よく読まれた記事の件数（検索クエリはその2倍）
+ */
+export async function fetchAnalytics({ days = 7, top = 5 }: Partial<Options> = {}): Promise<AnalyticsReport | null> {
+  const opts = { days, top }
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   if (!raw) return null
   const report: AnalyticsReport = { ga: null, gsc: null }
@@ -166,7 +173,7 @@ export async function fetchAnalytics(): Promise<AnalyticsReport | null> {
   const propertyId = process.env.GA4_PROPERTY_ID
   if (propertyId) {
     try {
-      report.ga = await fetchGa(token, propertyId)
+      report.ga = await fetchGa(token, propertyId, opts)
     } catch (err) {
       report.gaError = err instanceof Error ? err.message : String(err)
     }
@@ -175,7 +182,7 @@ export async function fetchAnalytics(): Promise<AnalyticsReport | null> {
   }
 
   try {
-    report.gsc = await fetchGsc(token, process.env.GSC_SITE_URL || 'https://sports-academia.com/')
+    report.gsc = await fetchGsc(token, process.env.GSC_SITE_URL || 'https://sports-academia.com/', opts)
   } catch (err) {
     report.gscError = err instanceof Error ? err.message : String(err)
   }

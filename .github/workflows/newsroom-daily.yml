@@ -27,6 +27,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       DAILY_ARTICLE_COUNT: ${{ vars.DAILY_ARTICLE_COUNT || '3' }}
+      # 記者が「読者の需要」を見るため（未設定なら省く）
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      GA4_PROPERTY_ID: ${{ vars.GA4_PROPERTY_ID }}
+      GSC_SITE_URL: ${{ vars.GSC_SITE_URL }}
     steps:
       - uses: actions/checkout@v4
 
