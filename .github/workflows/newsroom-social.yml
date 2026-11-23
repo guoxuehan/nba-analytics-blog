@@ -1,7 +1,7 @@
-name: "マーケ: X 自動投稿"
+name: "マーケ: SNS 自動投稿"
 
-# 毎時、公開時刻を過ぎた記事の配信Issueから X に投稿する。
-# X API のキー（Secrets）が未設定なら何もしない。
+# 毎時、公開時刻を過ぎた記事の配信Issueから SNS に投稿する。
+# 投稿先は認証情報が設定されているものだけ（Bluesky: 無料 / X: 従量課金）。どれも未設定なら何もしない。
 on:
   schedule:
     - cron: '10 * * * *' # 毎時10分
@@ -23,17 +23,19 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      BLUESKY_HANDLE: ${{ vars.BLUESKY_HANDLE }}
+      BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
       X_API_KEY: ${{ secrets.X_API_KEY }}
       X_API_SECRET: ${{ secrets.X_API_SECRET }}
       X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
       X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
-      X_DAILY_POST_LIMIT: ${{ vars.X_DAILY_POST_LIMIT || '1' }}
+      SOCIAL_DAILY_POST_LIMIT: ${{ vars.SOCIAL_DAILY_POST_LIMIT }}
     steps:
-      - name: キーが未設定なら終了
+      - name: 投稿先が未設定なら終了
         id: gate
         run: |
-          if [ -z "$X_API_KEY" ] || [ -z "$X_ACCESS_TOKEN" ]; then
-            echo "X API のキーが未設定のため、スキップします"
+          if { [ -z "$BLUESKY_HANDLE" ] || [ -z "$BLUESKY_APP_PASSWORD" ]; } && [ -z "$X_API_KEY" ]; then
+            echo "SNS の認証情報が未設定のため、スキップします"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -49,6 +51,6 @@ jobs:
       - run: npm ci
         if: steps.gate.outputs.skip != 'true'
 
-      - name: 📣 X に投稿
+      - name: 📣 SNS に投稿
         if: steps.gate.outputs.skip != 'true'
         run: npx tsx scripts/newsroom/social.ts
