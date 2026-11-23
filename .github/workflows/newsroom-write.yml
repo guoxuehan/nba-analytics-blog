@@ -1,0 +1,52 @@
+name: "編集部: ライター（執筆 → 入稿PR）"
+
+# 起動のされ方:
+#   - 編集長（newsroom-daily.yml）が採用した企画ごとに workflow_dispatch で起動
+#   - 人間が Issue に「企画:採用」ラベルを付けたとき
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: '企画のIssue番号'
+        required: true
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write # 校閲ワークフローを起動するため
+
+jobs:
+  write:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == '企画:採用'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # 企画ごとに並行して執筆する（同じ企画の二重執筆は防ぐ）
+    concurrency:
+      group: newsroom-write-${{ inputs.issue || github.event.issue.number }}
+      cancel-in-progress: false
+    env:
+      ISSUE: ${{ inputs.issue || github.event.issue.number }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: git の設定
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: ✍️ ライター（執筆 → PR作成 → 校閲へ）
+        run: npx tsx scripts/newsroom/writer.ts "$ISSUE"

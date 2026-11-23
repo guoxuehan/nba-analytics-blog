@@ -1,0 +1,71 @@
+name: "編集部: 朝会（記者 → 編集長）"
+
+# 毎日、記者が企画候補を出し、編集長が審査する。
+# 採用された企画は newsroom-write.yml（ライター）に回る。
+on:
+  schedule:
+    - cron: '0 9 * * *' # JST 18:00（米国の試合が終わった後）
+  workflow_dispatch:
+
+concurrency:
+  group: newsroom-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: write # 定期実行を止めないための空コミットを push する
+  issues: write
+  actions: write # ライターのワークフローを起動するため
+
+jobs:
+  editorial-meeting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      BALLDONTLIE_API_KEY: ${{ secrets.BALLDONTLIE_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      DAILY_ARTICLE_COUNT: ${{ vars.DAILY_ARTICLE_COUNT || '3' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: 取材（データ取得）
+        run: npx tsx scripts/fetch-nba-data.ts
+        continue-on-error: true # 取材に失敗しても、記者は一般テーマで企画を出せる
+
+      - name: 📰 記者（企画候補を Issue で提出）
+        run: npx tsx scripts/newsroom/reporter.ts
+
+      - name: 🧑‍💼 編集長（審査 → 採用分をライターへ）
+        run: npx tsx scripts/newsroom/editor.ts
+
+      # GitHub は60日間コミットのないリポジトリの定期実行を自動で止めるため、
+      # 最後のコミットから30日以上たっていたら空コミットを1つ積んで止まらないようにする
+      - name: Keep scheduled workflow active
+        if: always()
+        run: |
+          last=$(git log -1 --format=%ct)
+          days=$(( ($(date +%s) - last) / 86400 ))
+          echo "最後のコミットから ${days} 日"
+          if [ "$days" -ge 30 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Chore: keep scheduled workflow active"
+            git push
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nba-data
+          path: data/
+          retention-days: 14
+          if-no-files-found: ignore

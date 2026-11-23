@@ -18,7 +18,12 @@
     "pipeline:fetch": "tsx scripts/fetch-nba-data.ts",
     "pipeline:generate": "tsx scripts/auto-generate.ts",
     "pipeline:publish": "tsx scripts/auto-publish.ts",
-    "migrate:images": "tsx scripts/migrate-images.ts"
+    "migrate:images": "tsx scripts/migrate-images.ts",
+    "newsroom:pitch": "tsx scripts/newsroom/reporter.ts",
+    "newsroom:review": "tsx scripts/newsroom/editor.ts",
+    "newsroom:write": "tsx scripts/newsroom/writer.ts",
+    "newsroom:score": "tsx scripts/newsroom/score.ts",
+    "newsroom:publish": "tsx scripts/newsroom/publisher.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

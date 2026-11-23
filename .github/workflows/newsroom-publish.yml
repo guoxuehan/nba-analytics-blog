@@ -1,0 +1,47 @@
+name: "編集部: 公開 → マーケ担当"
+
+# master の content/articles/ を Supabase に反映し、新しい記事の配信案を作る。
+# 起動のされ方:
+#   - 人間が記事PRをマージしたとき（push）
+#   - デスク判定が自動マージしたとき（workflow_dispatch。GITHUB_TOKEN のマージでは push が発火しないため）
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'content/articles/**'
+  workflow_dispatch:
+
+# 公開処理は全記事を毎回照合するので、待機中の実行が置き換わっても取りこぼさない
+concurrency:
+  group: newsroom-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://sports-academia.com' }}
+      PUBLISH_INTERVAL_HOURS: ${{ vars.PUBLISH_INTERVAL_HOURS || '4' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: 🚀 公開 → 📣 マーケ担当
+        run: npx tsx scripts/newsroom/publisher.ts
