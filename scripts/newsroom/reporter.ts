@@ -79,7 +79,11 @@ function buildDataSheet(data: NBALatestData, standings: StandingsData | null): s
     lines.push(`[試合 ${data.date}] ${resultText(g)}（${g.scoreDiff}点差）${leaders}`)
   }
   for (const s of data.topScorers ?? []) {
-    lines.push(`[個人 ${data.date}] ${s.playerName}（${s.team}）${s.pts}得点 ${s.reb}リバウンド ${s.ast}アシスト`)
+    // 不明な値（null）は書かない。0 と書くと「0本だった」という誤った事実になる
+    const extra = [s.reb != null ? `${s.reb}リバウンド` : '', s.ast != null ? `${s.ast}アシスト` : '']
+      .filter(Boolean)
+      .join(' ')
+    lines.push(`[個人 ${data.date}] ${s.playerName}（${s.team}）${s.pts}得点${extra ? ` ${extra}` : ''}`)
   }
   if (standings) {
     const early = isEarlySeason(standings)
