@@ -47,6 +47,14 @@ jobs:
       - name: 🧑‍💼 編集長（審査 → 採用分をライターへ）
         run: npx tsx scripts/newsroom/editor.ts
 
+      # 各ワークフローが個別に成功していても、流れ全体で記事が出なくなっていないかを確かめる。
+      # 最後の公開から STALE_DAYS 日（初期値2日）以上たっていたら失敗にして通知を出す
+      - name: 🩺 健康診断（公開が止まっていないか）
+        if: always()
+        run: npx tsx scripts/newsroom/health-check.ts
+        env:
+          STALE_DAYS: ${{ vars.STALE_DAYS || '2' }}
+
       # GitHub は60日間コミットのないリポジトリの定期実行を自動で止めるため、
       # 最後のコミットから30日以上たっていたら空コミットを1つ積んで止まらないようにする
       - name: Keep scheduled workflow active
