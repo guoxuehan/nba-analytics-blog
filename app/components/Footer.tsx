@@ -86,6 +86,15 @@ export function Footer() {
             © {year} NBA Court Vision. All rights reserved.
           </p>
           <nav className="flex flex-wrap gap-x-5 gap-y-1" aria-label="ポリシーリンク">
+            <Link href="/about" className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150">
+              編集部について
+            </Link>
+            <Link href="/editorial-policy" className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150">
+              編集方針
+            </Link>
+            <Link href="/feed.xml" className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150">
+              RSS
+            </Link>
             <Link href="/privacy-policy" className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150">
               プライバシーポリシー
             </Link>

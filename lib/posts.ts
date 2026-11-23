@@ -17,6 +17,7 @@ export type Post = {
 export type PostDetail = Post & {
   content: string
   tags: string[]
+  updated_at?: string | null
 }
 
 // ─── 読了時間（500字/分で計算） ───────────────────────────────
