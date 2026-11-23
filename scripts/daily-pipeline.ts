@@ -97,13 +97,22 @@ async function main() {
   log(
     `  生成: ${generateStep.value?.generated ?? 0}本 / 公開: ${publishStats.published}本 / レビュー待ち: ${publishStats.needsReview}本`,
   )
+  // 記事は生成できたのに1本も公開もレビュー待ちにもならなかった場合は、
+  // 公開処理のどこかが壊れているので失敗として扱う
+  const generated = generateStep.value?.generated ?? 0
+  const nothingPublished =
+    generated > 0 && publishStats.published === 0 && publishStats.needsReview === 0
+  if (nothingPublished) {
+    log(`  ❌ ${generated}本生成したのに1本も公開されませんでした（スキップ: ${publishStats.skipped}本）`)
+  }
+
   log(`  実行時間: ${elapsed}秒`)
   log(`  ログ保存先: logs/${today}.log`)
   log('')
 
   flushLog()
 
-  if (steps.some((s) => !s.success)) process.exit(1)
+  if (steps.some((s) => !s.success) || nothingPublished) process.exit(1)
 }
 
 main().catch((err) => {

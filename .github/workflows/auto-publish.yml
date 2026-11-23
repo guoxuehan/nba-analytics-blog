@@ -6,6 +6,9 @@ on:
     - cron: '0 9 * * *'   # JST 18:00（UTC 09:00）
   workflow_dispatch:
 
+permissions:
+  contents: write  # 定期実行を止めないための空コミットを push する
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -33,13 +36,21 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - name: Commit new thumbnails
+      # GitHub は60日間コミットのないリポジトリの定期実行を自動で止めるため、
+      # 最後のコミットから30日以上たっていたら空コミットを1つ積んで止まらないようにする。
+      # パイプラインが失敗した日も実行する（失敗が続いても定期実行自体は止めない）
+      - name: Keep scheduled workflow active
+        if: always()
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/images/thumbnails/
-          git diff --cached --quiet || git commit -m "Add: new article thumbnails"
-          git push
+          last=$(git log -1 --format=%ct)
+          days=$(( ($(date +%s) - last) / 86400 ))
+          echo "最後のコミットから ${days} 日"
+          if [ "$days" -ge 30 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Chore: keep scheduled workflow active"
+            git push
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()

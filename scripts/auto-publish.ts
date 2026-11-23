@@ -286,11 +286,11 @@ export async function run(): Promise<{ published: number; needsReview: number; s
   const { error } = await supabase.from('articles').insert(rows)
 
   if (error) {
-    console.error(`\n❌ 一括 INSERT 失敗: ${error.message}`)
-    if (error.message.includes('row-level security')) {
-      console.error('   → Supabase の articles テーブル INSERT ポリシーを確認してください')
-    }
-    return { published: 0, needsReview, skipped: skipped + publishQueue.length }
+    // 失敗として扱い、GitHub Actions で気づけるようにする
+    const hint = error.message.includes('row-level security')
+      ? '（Supabase の articles テーブル INSERT ポリシーを確認してください）'
+      : ''
+    throw new Error(`記事の公開（一括 INSERT）に失敗しました: ${error.message}${hint}`)
   }
 
   console.log(`\n✅ ${rows.length}件を一括 INSERT 完了`)
