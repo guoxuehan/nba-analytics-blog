@@ -44,11 +44,16 @@ function ConferenceTable({ conference, label, standings }: { conference: Confere
         </thead>
         <tbody>
           {teams.map(({ team, standing }) => (
-            <tr key={team.slug} className="border-b border-border">
+            <tr key={team.slug} className="border-b border-border hover:bg-bg-secondary transition-colors">
               <td className="py-2 pr-2 text-text-secondary">{standing?.seed ?? ''}</td>
               <td className="py-2 pr-2">
-                <Link href={`/teams/${team.slug}`} className="text-text-primary hover:text-accent transition-colors">
+                {/* リンクだと分かるよう、下線と矢印を付ける */}
+                <Link
+                  href={`/teams/${team.slug}`}
+                  className="font-bold text-text-primary underline decoration-border underline-offset-4 hover:text-accent hover:decoration-accent transition-colors"
+                >
                   {team.ja}
+                  <span className="ml-1 text-text-secondary" aria-hidden="true">›</span>
                 </Link>
               </td>
               {standing && (

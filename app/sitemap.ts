@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next'
 import { getPublishedPosts, getPostDate } from '@/lib/posts'
 import { SITE_URL } from '@/lib/constants'
 import { TEAMS } from '@/lib/teams'
+import { PLAYERS } from '@/lib/players'
 
 // 1時間ごとに作り直す。指定しないとデプロイ時点の記事一覧のまま固定され、
 // 自動公開した新しい記事が検索エンジンに伝わらない
@@ -31,6 +32,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...TEAMS.map((team) => ({
       url: `${SITE_URL}/teams/${team.slug}`,
       changeFrequency: 'daily' as const,
+      priority: 0.6,
+    })),
+    {
+      url: `${SITE_URL}/players`,
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    },
+    ...PLAYERS.map((player) => ({
+      url: `${SITE_URL}/players/${player.slug}`,
+      changeFrequency: 'weekly' as const,
       priority: 0.6,
     })),
     ...CATEGORIES.map((category) => ({
