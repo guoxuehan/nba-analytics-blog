@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { affiliateEnabled, amazonEnabled } from '@/lib/affiliates'
 
 export const metadata: Metadata = {
   title: 'プライバシーポリシー',
@@ -30,8 +31,18 @@ export default function PrivacyPolicyPage() {
           <p>Google Analyticsのデータ収集・処理の仕組みについては、<a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">Googleのポリシーと規約</a>をご確認ください。Google Analyticsのオプトアウトは<a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer">Google Analyticsオプトアウトアドオン</a>から行えます。</p>
 
           <h2>広告配信について</h2>
-          <p>当サイトでは、Google AdSenseを利用した広告を掲載しています。Google AdSenseは、ユーザーの興味に基づいた広告を表示するためにCookieを使用します。広告のカスタマイズを無効にしたい場合は、<a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Googleの広告設定ページ</a>から設定できます。</p>
+          <p>当サイトでは、Google AdSenseを利用した広告を掲載する場合があります。Google AdSenseは、ユーザーの興味に基づいた広告を表示するためにCookieを使用します。広告のカスタマイズを無効にしたい場合は、<a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Googleの広告設定ページ</a>から設定できます。</p>
           <p>第三者配信の広告サービスに関する詳細は、<a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer">Googleの広告ポリシー</a>をご確認ください。</p>
+
+          {/* 実際にアフィリエイトの ID を設定しているときだけ表示する */}
+          {affiliateEnabled() && (
+            <>
+              <h2>アフィリエイトプログラムについて</h2>
+              <p>当サイトは、アフィリエイトプログラムに参加しています。記事内の「関連商品を探す」リンクから商品を購入された場合、当サイトが紹介料を受け取ることがあります。アフィリエイトリンクを含む記事には、その旨を表示しています。</p>
+              {amazonEnabled() && <p>Amazonのアソシエイトとして、当サイトは適格販売により収入を得ています。</p>}
+              <p>紹介料の有無は、記事の評価や分析の内容に影響しません。</p>
+            </>
+          )}
 
           <h2>外部リンクについて</h2>
           <p>当サイトには外部サイトへのリンクが含まれる場合があります。リンク先のプライバシーポリシーについては各サイトにてご確認ください。当サイトは外部サイトのコンテンツについて責任を負いません。</p>

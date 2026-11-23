@@ -91,6 +91,17 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
    Search Console がドメインプロパティなら、Variables の `GSC_SITE_URL` を `sc-domain:sports-academia.com` にする（既定は `https://sports-academia.com/`）。
 6. **Supabase**: 記事の修正を反映するには、`articles` テーブルに UPDATE を許可する RLS ポリシーが必要（INSERT は既存の運用で許可済み）。
 
+## 収益化
+
+段階: ① アクセスを増やす（定番記事）＋アフィリエイト → ② 月間PV 1万で AdSense を申請 → ③ 有料コンテンツ・スポンサー・仕組みの外販を検討。
+週次レポートの「月間PV」「AdSense 申請の目安」「アフィリエイトのクリック」「検索の表示回数」で進み具合を追う。
+
+- **アフィリエイト**: ライターは、読者の「見る・買う」につながる記事に限り、本文の最後に `:::shop キーワード` を1行入れる。
+  記事ではその位置に楽天・Amazon の**検索結果**へのリンク枠が出る（AI に商品URLを書かせない）。クリックは GA4 の `affiliate_click` イベントで数える。
+- **ID の設定**: [lib/affiliates.ts](../lib/affiliates.ts) の `RAKUTEN_AFFILIATE_ID`・`AMAZON_ASSOCIATE_TAG`（または同名の `NEXT_PUBLIC_` 環境変数）。
+  未設定のあいだは、枠も「プロモーションを含む」表示も、プライバシーポリシーのアフィリエイトの記載も出ない。
+- **表示義務**: 枠のある記事は冒頭に「PR この記事にはプロモーションが含まれます」と出す（ステルスマーケティング規制）。Amazon を使うときは定型文も出す。
+
 ## 設計上の注意
 
 - `GITHUB_TOKEN` で起きた操作（ラベル付与、PR作成、マージ）は、別のワークフローを起動しない（GitHub の仕様）。そのため、各段階で次のワークフローを `gh workflow run` で明示的に起動している。人間がラベルを付けたりマージしたりした場合は、通常のイベントで起動する。

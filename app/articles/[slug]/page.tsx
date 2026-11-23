@@ -24,6 +24,7 @@ import { CommentSection, type Comment } from '@/app/components/CommentSection'
 import { getSupabase } from '@/lib/supabase'
 import { findTeamByTag } from '@/lib/teams'
 import { findPlayerByTag } from '@/lib/players'
+import { hasShop } from '@/lib/affiliates'
 
 // ─── 静的パス生成 ─────────────────────────────────────────────
 
@@ -213,6 +214,19 @@ export default async function ArticlePage({
                   {readingTime} min read
                 </span>
               </div>
+
+              {/* アフィリエイトリンクを含む記事は、その旨を冒頭に表示する（ステルスマーケティング規制への対応） */}
+              {hasShop(post.content) && (
+                <p className="mt-4 text-text-secondary font-body" style={{ fontSize: '12px' }}>
+                  <span
+                    className="inline-block mr-2 px-1.5 py-[1px] border border-border font-bold"
+                    style={{ borderRadius: '2px', fontSize: '11px' }}
+                  >
+                    PR
+                  </span>
+                  この記事にはプロモーション（アフィリエイトリンク）が含まれます。
+                </p>
+              )}
             </div>
           </div>
         </header>
