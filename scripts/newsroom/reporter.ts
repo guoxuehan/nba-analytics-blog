@@ -30,10 +30,12 @@ import {
   loadPersona,
   todayJST,
 } from './_lib'
+import { fetchAnalytics } from './analytics'
 
 const CATEGORIES = ['player_analysis', 'team_analysis', 'tactics', 'data'] as const
 
 type Pitch = {
+  kind: 'news' | 'evergreen'
   title: string
   category: (typeof CATEGORIES)[number]
   focus: string
@@ -53,8 +55,13 @@ const PITCH_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['title', 'category', 'focus', 'angle', 'why_now', 'writer_brief', 'facts'],
+        required: ['kind', 'title', 'category', 'focus', 'angle', 'why_now', 'writer_brief', 'facts'],
         properties: {
+          kind: {
+            type: 'string',
+            enum: ['news', 'evergreen'],
+            description: 'news = 昨夜の試合など今日の出来事が起点 / evergreen = 時間がたっても読まれるデータ・歴史・解説',
+          },
           title: { type: 'string', description: '仮タイトル（30〜40字）' },
           category: { type: 'string', enum: [...CATEGORIES] },
           focus: { type: 'string', description: '中心となるチーム名または選手名（日本語）' },
@@ -105,7 +112,7 @@ function issueBody(p: Pitch, sheet: Set<string>): string {
   return [
     '> 📰 記者が提出した企画候補です。編集長が審査し、採用されるとライターが執筆します。',
     '',
-    `**カテゴリ**: \`${p.category}\` / **主役**: ${p.focus}`,
+    `**種類**: ${p.kind === 'evergreen' ? '定番（データ・歴史・解説）' : '速報（今日の出来事）'} / **カテゴリ**: \`${p.category}\` / **主役**: ${p.focus}`,
     '',
     '## 切り口',
     p.angle,
@@ -121,7 +128,7 @@ function issueBody(p: Pitch, sheet: Set<string>): string {
       ? ['```text', ...facts, '```'].join('\n')
       : '（取材データの引用なし。一般的な分析テーマ）',
     '',
-    `<!-- newsroom:category=${p.category} -->`,
+    `<!-- newsroom:category=${p.category} kind=${p.kind} -->`,
   ].join('\n')
 }
 
@@ -151,6 +158,22 @@ export async function run(): Promise<number[]> {
   const openPitches = listOpen(LABELS.pitch)
   const openApproved = listOpen(LABELS.approved)
 
+  // 読者の需要: 直近28日によく読まれた記事と検索クエリ（GA4・Search Console が設定されていれば）
+  const analytics = await fetchAnalytics({ days: 28, top: 10 }).catch(() => null)
+  const demand = [
+    ...(analytics?.ga?.topPages.length
+      ? ['よく読まれた記事（GA4・直近28日のPV）:', ...analytics.ga.topPages.map((p) => `- ${p.title}: ${p.views}`)]
+      : []),
+    ...(analytics?.gsc?.topQueries.length
+      ? [
+          '検索クエリ（Search Console・直近28日。表示が多いのに順位が低いものは伸びしろ）:',
+          ...analytics.gsc.topQueries.map(
+            (q) => `- ${q.query}: 表示 ${q.impressions} / クリック ${q.clicks} / 平均順位 ${q.position.toFixed(1)}`,
+          ),
+        ]
+      : []),
+  ]
+
   const sheetLines = buildDataSheet(data, standings)
   const sheet = new Set(sheetLines)
   const count = DAILY_ARTICLE_COUNT + 2
@@ -166,6 +189,9 @@ export async function run(): Promise<number[]> {
     '',
     '## 直近14日に掲載した記事（同じ主役・同じ問いは避ける）',
     ...describeRecent(recent),
+    '',
+    '## 読者の需要（定番企画のヒント）',
+    ...(demand.length > 0 ? demand : ['（データなし）']),
     '',
     '## 進行中の企画（重複させない）',
     ...[...openPitches, ...openApproved].map((i) => `- #${i.number} ${i.title}`),

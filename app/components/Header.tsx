@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { label: 'チーム分析', href: '/category/team_analysis' },
   { label: '戦術', href: '/category/tactics' },
   { label: 'データ', href: '/category/data' },
+  { label: 'チーム', href: '/teams' },
 ]
 
 // ─── アイコン（インライン SVG） ─────────────────────────────

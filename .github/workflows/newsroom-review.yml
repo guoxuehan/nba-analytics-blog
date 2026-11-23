@@ -94,13 +94,14 @@ jobs:
             手順:
             1. 職務記述書、原稿、取材メモを読む。
             2. ファクトチェックと校正を行い、原稿ファイルを Edit ツールで直接修正する。編集してよいのは原稿ファイルだけ。
+               取材メモにない数字・記録は、WebSearch / WebFetch で信頼できる情報源に当たって確認する。
             3. 判定（verdict）、要約（summary、2〜3文の日本語）、ファクトチェックで見つけた問題（fact_issues）、主な修正（edits）を返す。
 
             git の操作や GitHub へのコメントはしないこと（後続のステップが行う）。
           claude_args: |
             --model claude-opus-5-5
-            --max-turns 40
-            --allowedTools "Read,Edit,Glob,Grep"
+            --max-turns 60
+            --allowedTools "Read,Edit,Glob,Grep,WebSearch,WebFetch"
             --json-schema '{"type":"object","additionalProperties":false,"required":["verdict","summary","fact_issues","edits"],"properties":{"verdict":{"type":"string","enum":["pass","needs_human","reject"]},"summary":{"type":"string"},"fact_issues":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["claim","problem","action"],"properties":{"claim":{"type":"string"},"problem":{"type":"string"},"action":{"type":"string"}}}},"edits":{"type":"array","items":{"type":"string"}}}}'
 
       - name: 校閲の修正をコミット

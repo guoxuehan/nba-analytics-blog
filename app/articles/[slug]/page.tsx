@@ -22,6 +22,7 @@ import { ShareButtons } from '@/app/components/ShareButtons'
 import { SITE_URL } from '@/lib/constants'
 import { CommentSection, type Comment } from '@/app/components/CommentSection'
 import { getSupabase } from '@/lib/supabase'
+import { TEAMS } from '@/lib/teams'
 
 // ─── 静的パス生成 ─────────────────────────────────────────────
 
@@ -250,7 +251,11 @@ export default async function ArticlePage({
                   {post.tags.map((tag) => (
                     <Link
                       key={tag}
-                      href={`/tag/${encodeURIComponent(tag)}`}
+                      // チーム名のタグは、順位と記事がまとまったチームページへ
+                      href={(() => {
+                        const team = TEAMS.find((t) => t.ja === tag)
+                        return team ? `/teams/${team.slug}` : `/tag/${encodeURIComponent(tag)}`
+                      })()}
                       className="px-3 py-1 text-[12px] font-bold uppercase tracking-wider text-text-secondary border border-border hover:border-accent hover:text-accent transition-colors duration-150 font-heading"
                       style={{ borderRadius: '2px' }}
                     >
