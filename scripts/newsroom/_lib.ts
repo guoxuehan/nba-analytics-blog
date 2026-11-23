@@ -193,6 +193,27 @@ export function readArticle(filepath: string): ArticleFile | null {
   return { meta: { ...parsed.meta, issue: issue ? parseInt(issue, 10) : undefined }, body: parsed.body }
 }
 
+const CATEGORY_JA: Record<string, string> = {
+  player_analysis: '選手分析',
+  team_analysis: 'チーム分析',
+  tactics: '戦術',
+  data: 'データ',
+}
+
+/**
+ * 直近の掲載記事を、カテゴリ別の本数とカテゴリ付きの一覧にする（記者・編集長の重複・偏りチェック用）
+ */
+export function describeRecent(recent: { title: string; category?: string }[]): string[] {
+  if (recent.length === 0) return ['（なし）']
+  const counts = Object.entries(CATEGORY_JA)
+    .map(([key, ja]) => `${ja} ${recent.filter((a) => a.category === key).length}本`)
+    .join('、')
+  return [
+    `カテゴリ別: ${counts}（4カテゴリが偏らないようにする）`,
+    ...recent.map((a) => `- [${CATEGORY_JA[a.category ?? ''] ?? '不明'}] ${a.title}`),
+  ]
+}
+
 export function todayJST(): string {
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().split('T')[0]
 }

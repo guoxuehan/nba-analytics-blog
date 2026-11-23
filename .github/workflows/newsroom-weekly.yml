@@ -1,0 +1,35 @@
+name: "経営企画: 週次レポート"
+
+# 毎週月曜の朝、編集部の1週間の稼働をまとめて Issue で報告する
+on:
+  schedule:
+    - cron: '0 0 * * 1' # 月曜 JST 9:00
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read # 失敗したワークフローを集計するため
+
+jobs:
+  weekly-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: 📊 経営企画（集計 → 週次レポート）
+        run: npx tsx scripts/newsroom/weekly-report.ts

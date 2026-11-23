@@ -12,6 +12,7 @@ import {
   appendSummary,
   callJson,
   commentIssue,
+  describeRecent,
   dispatchWorkflow,
   ensureLabels,
   gh,
@@ -68,7 +69,7 @@ async function main() {
     'すべての候補について、採用か不採用かを決めること。',
     '',
     '## 直近14日に掲載した記事',
-    ...(recent.length > 0 ? recent.map((a) => `- ${a.title}`) : ['（なし）']),
+    ...describeRecent(recent),
     '',
     '## 企画候補',
     ...candidates.map((c) =>

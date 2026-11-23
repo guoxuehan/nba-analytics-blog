@@ -188,6 +188,7 @@ export type RecentArticle = {
   slug: string
   title: string
   tags: string[]
+  category?: string
   published_at: string | null
 }
 
@@ -202,7 +203,7 @@ export async function fetchRecentArticles(): Promise<RecentArticle[]> {
     const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data } = await supabase
       .from('articles')
-      .select('slug, title, tags, published_at')
+      .select('slug, title, tags, category, published_at')
       .gte('published_at', since)
       .order('published_at', { ascending: false })
     return (data as RecentArticle[]) ?? []
