@@ -6,6 +6,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
+  // 1つのテストで複数ページを順に確認するため、既定の30秒では足りないことがある
+  timeout: 60_000,
   reporter: [
     ['list'],
     ['html', { open: 'never' }],

@@ -28,7 +28,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 type IssueRow = { number: number; title: string; state: string; createdAt: string; labels: { name: string }[] }
 type PrRow = { number: number; title: string; state: string; createdAt: string; mergedAt: string | null; labels: { name: string }[] }
-type RunRow = { workflowName: string; conclusion: string; createdAt: string; url: string }
+type RunRow = { workflowName: string; conclusion: string; createdAt: string; url: string; event: string; headBranch: string }
 type Insight = { highlights: string[]; issues: string[]; actions: string[] }
 
 const INSIGHT_SCHEMA = {
@@ -83,8 +83,11 @@ async function main() {
   const waitingHuman = prs.filter((p) => p.state === 'OPEN' && has(p, LABELS.needsHuman))
 
   const runs = ghJson<RunRow[]>([
-    'run', 'list', '--limit', '200', '--json', 'workflowName,conclusion,createdAt,url',
-  ]).filter((r) => inWindow(r.createdAt))
+    'run', 'list', '--limit', '200', '--json', 'workflowName,conclusion,createdAt,url,event,headBranch',
+  ])
+    .filter((r) => inWindow(r.createdAt))
+    // ボットの記事PRで作られる pull_request の実行は、承認待ちのまま一度も動かずに「失敗」で終わるので数えない
+    .filter((r) => !(r.event === 'pull_request' && r.headBranch.startsWith('article/')))
   const failedRuns = runs.filter((r) => r.conclusion === 'failure')
   const failedByWorkflow = [...new Set(failedRuns.map((r) => r.workflowName))].map((name) => ({
     name,

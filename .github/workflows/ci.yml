@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main, master]
+    # 記事・取材メモだけの変更はサイトのコードに影響しないので CI を回さない
+    paths-ignore: ['content/**']
   pull_request:
     branches: [main, master]
+    # ライター（ボット）の記事PRは承認待ちのまま「失敗」扱いで終わっていたため、対象外にする
+    paths-ignore: ['content/**']
 
 jobs:
   ci:

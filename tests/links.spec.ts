@@ -4,14 +4,19 @@ import { test, expect, type Page } from '@playwright/test'
 
 const FAILED_LINKS: { location: string; href: string }[] = []
 
-/** リンクをクリックして404でないことを確認 */
+/**
+ * リンク先が404でないことを確認する。
+ * 確かめたいのはステータスだけなので、ページを描画せず HTTP リクエストだけ送る
+ * （描画すると1件ごとに時間がかかり、リンクの多いフッターのテストが時間切れになっていた。
+ *   また RSS などの XML はブラウザがダウンロード扱いにして ERR_ABORTED になる）
+ */
 async function assertLinkNotFound(
   page: Page,
   href: string,
   location: string,
 ) {
-  const response = await page.goto(href)
-  const status = response?.status() ?? 0
+  const response = await page.request.get(href)
+  const status = response.status()
 
   if (status === 404) {
     FAILED_LINKS.push({ location, href })
