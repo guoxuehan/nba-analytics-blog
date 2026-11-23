@@ -67,12 +67,26 @@ const report = [
 
 commentPr(parseInt(pr, 10), report)
 
+/** 前回の校閲で付いたラベルを外す（付いていない・存在しないラベルでも失敗させない） */
+function removeLabels(...names: string[]) {
+  const current = new Set(labels.map((l) => l.name))
+  for (const name of names.filter((n) => current.has(n))) {
+    try {
+      gh(['pr', 'edit', pr, '--remove-label', name])
+    } catch {
+      // ラベルの片付けに失敗しても判定は続ける
+    }
+  }
+}
+
 if (autoMerge) {
+  removeLabels(LABELS.reviewNg, LABELS.needsHuman)
   gh(['pr', 'edit', pr, '--add-label', LABELS.reviewOk])
   gh(['pr', 'merge', pr, '--squash', '--delete-branch'])
   // GITHUB_TOKEN によるマージでは push イベントが発火しないため、公開ワークフローを明示的に起動する
   dispatchWorkflow('newsroom-publish.yml')
 } else {
+  removeLabels(LABELS.reviewOk)
   gh(['pr', 'edit', pr, '--add-label', LABELS.reviewNg, '--add-label', LABELS.needsHuman])
 }
 

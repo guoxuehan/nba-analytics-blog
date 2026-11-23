@@ -57,8 +57,9 @@ export type TopScorer = {
   team: string
   teamAbbr: string
   pts: number
-  reb: number
-  ast: number
+  /** null = 不明（ESPN はチーム内の各部門トップしか返さないため、得点王の値が取れないことがある） */
+  reb: number | null
+  ast: number | null
   gameId: string
 }
 
@@ -522,10 +523,11 @@ function extractTopScorers(games: GameSummary[]): TopScorer[] {
         team,
         teamAbbr,
         pts: ptsLeader.value,
+        // 得点王が同じチームのリバウンド・アシスト部門のトップでなければ、値は不明（0 ではない）
         reb:
-          rebLeader?.playerName === ptsLeader.playerName ? rebLeader.value : 0,
+          rebLeader?.playerName === ptsLeader.playerName ? rebLeader.value : null,
         ast:
-          astLeader?.playerName === ptsLeader.playerName ? astLeader.value : 0,
+          astLeader?.playerName === ptsLeader.playerName ? astLeader.value : null,
         gameId: g.id,
       })
     }
