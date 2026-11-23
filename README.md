@@ -136,6 +136,7 @@ E2EテストはChromiumを使用する。初回は `npx playwright install chrom
 | 執筆（ライター） | `newsroom-write.yml` | 記事PR（`content/articles/`） |
 | 校閲（校閲デスク・デスク判定） | `newsroom-review.yml` | 修正コミット、レポート、自動マージ |
 | 公開（マーケ担当） | `newsroom-publish.yml` | Supabase への反映、配信 Issue |
+| 週次レポート（経営企画） | `newsroom-weekly.yml`（毎週月曜 JST 9:00） | 週次レポート Issue |
 
 組織図・社長ができる操作・初期設定は [docs/newsroom.md](docs/newsroom.md) を参照。
 

@@ -13,6 +13,7 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 | 🔍 校閲デスク | [.claude/agents/copy-desk.md](../.claude/agents/copy-desk.md) | claude-code-action（[newsroom-review.yml](../.github/workflows/newsroom-review.yml)） | 入稿されたとき | Claudeサブスク（Opus） |
 | ✅ デスク判定 | — | [scripts/newsroom/review-gate.ts](../scripts/newsroom/review-gate.ts) | 校閲の後 | 無料 |
 | 📣 マーケ担当 | [.claude/agents/marketer.md](../.claude/agents/marketer.md) | [scripts/newsroom/marketer.ts](../scripts/newsroom/marketer.ts) | 公開されたとき | API（Sonnet） |
+| 📊 経営企画 | [.claude/agents/strategist.md](../.claude/agents/strategist.md) | [scripts/newsroom/weekly-report.ts](../scripts/newsroom/weekly-report.ts) | 毎週月曜 JST 9:00 | API（Sonnet） |
 | 🤖 @claude | — | claude-code-action（[claude.yml](../.github/workflows/claude.yml)） | `@claude` とコメントしたとき | Claudeサブスク |
 
 職務記述書は、ローカルの Claude Code でもサブエージェントとしてそのまま使える。
@@ -41,6 +42,10 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 [公開 newsroom-publish.yml]
   🚀 content/articles/ を Supabase に反映（新規は PUBLISH_INTERVAL_HOURS ずつ公開時刻をずらす）
   📣 マーケ担当: X投稿文3パターンを配信 Issue で起票   ラベル: マーケ:配信待ち
+
+[週次レポート newsroom-weekly.yml / 毎週月曜 JST 9:00]
+  📊 経営企画: 公開本数・カテゴリ内訳・企画の採用率・自動公開率・確認待ち・失敗したワークフローを集計し、
+              所見と来週のアクションを Issue で報告                         ラベル: 経営:週次レポート
 ```
 
 ## 社長（人間）ができること
@@ -54,6 +59,7 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 | 確認待ちの記事を公開する | PR をマージする（マージで公開ワークフローが動く） |
 | 校閲をやり直す | Actions →「編集部: 校閲デスク」→ Run workflow に PR 番号を入れる |
 | 朝会を今すぐ開く | Actions →「編集部: 朝会」→ Run workflow |
+| 週次レポートを今すぐ作る | Actions →「経営企画: 週次レポート」→ Run workflow |
 | 記者の企画をローカルで試す | `DRY_RUN=1 npx tsx scripts/newsroom/reporter.ts`（GitHub を操作しない） |
 
 ## 初期設定
