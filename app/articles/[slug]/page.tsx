@@ -49,6 +49,8 @@ export async function generateMetadata({
     description: post.excerpt ?? undefined,
     alternates: {
       canonical: `${siteUrl}/articles/${post.slug}`,
+      // alternates はレイアウトの値を丸ごと上書きするため、RSS もここで指定し直す
+      types: { 'application/rss+xml': `${siteUrl}/feed.xml` },
     },
     openGraph: {
       title: post.title,
@@ -102,24 +104,36 @@ export default async function ArticlePage({
   const relatedForBottom = relatedPosts.slice(0, 3)
   const relatedForSidebar = relatedPosts.slice(0, 3)
 
-  // JSON-LD 構造化データ
+  // JSON-LD 構造化データ（ニュース記事として検索エンジンに伝える）
   const siteUrl = SITE_URL
+  const articleUrl = `${siteUrl}/articles/${post.slug}`
+  const publishedAt = getPostDate(post)
+  // 公開予約より前に作った行は updated_at が公開日時より古いので、新しいほうを更新日時にする
+  const modifiedAt =
+    post.updated_at && new Date(post.updated_at) > new Date(publishedAt) ? post.updated_at : publishedAt
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'Article',
+    '@type': 'NewsArticle',
     headline: post.title,
     description: post.excerpt ?? '',
-    datePublished: getPostDate(post),
-    dateModified: getPostDate(post),
-    url: `${siteUrl}/articles/${post.slug}`,
+    datePublished: publishedAt,
+    dateModified: modifiedAt,
+    url: articleUrl,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': articleUrl },
+    inLanguage: 'ja',
+    articleSection: getCategoryLabel(post.category),
+    keywords: post.tags.join(', '),
+    isAccessibleForFree: true,
     publisher: {
       '@type': 'Organization',
       name: 'NBA COURT VISION',
       url: siteUrl,
+      logo: { '@type': 'ImageObject', url: `${siteUrl}/icon.svg` },
     },
     author: {
       '@type': 'Organization',
-      name: 'NBA COURT VISION',
+      name: 'NBA COURT VISION 編集部',
+      url: `${siteUrl}/about`,
     },
     image: {
       '@type': 'ImageObject',
@@ -132,7 +146,8 @@ export default async function ArticlePage({
       {/* JSON-LD */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // `<` をエスケープして、記事データ経由のスクリプト注入を防ぐ（Next.js の JSON-LD ガイドに従う）
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
 
       <article>
@@ -244,6 +259,17 @@ export default async function ArticlePage({
                   ))}
                 </div>
               )}
+
+              {/* ── 制作体制の表示 ───────────────────────────────── */}
+              <p
+                className="mt-6 text-text-secondary font-body leading-relaxed"
+                style={{ fontSize: '12px' }}
+              >
+                この記事は、AIを活用したNBA COURT VISION編集部が作成し、数字を取材データと照合する校閲を経て公開しています。
+                制作の流れは<Link href="/about" className="underline hover:text-text-primary">編集部について</Link>、
+                方針は<Link href="/editorial-policy" className="underline hover:text-text-primary">編集方針</Link>をご覧ください。
+                誤りにお気づきの際は<Link href="/contact" className="underline hover:text-text-primary">お問い合わせ</Link>からお知らせください。
+              </p>
 
               {/* ── SNSシェア ──────────────────────────────────── */}
               <div className="mt-6 pt-5 border-t border-border">

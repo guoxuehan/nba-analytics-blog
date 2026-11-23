@@ -7,6 +7,7 @@ import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { PageTransition } from './components/PageTransition'
 import './globals.css'
+import { SITE_URL } from '@/lib/constants'
 
 // 見出し: ESPN風コンデンスド書体
 const oswald = Oswald({
@@ -51,6 +52,10 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'NBA COURT VISION — NBAアナリティクス',
     description: 'NBAの高度なアナリティクス、選手分析、戦術解説',
+  },
+  // RSS リーダーやブラウザがフィードを見つけられるようにする
+  alternates: {
+    types: { 'application/rss+xml': `${SITE_URL}/feed.xml` },
   },
   verification: {
     google: '41G1SRV6dpQhDMJROIpMiBCojflXM9voDPxaB75Qock',
