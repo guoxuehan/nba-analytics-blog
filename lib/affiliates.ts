@@ -8,7 +8,7 @@
  * ID は公開リンクに含まれる値なので、ここに直接書いてよい（環境変数があればそちらを優先）
  */
 
-const AMAZON_ASSOCIATE_TAG = process.env.NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG || ''
+const AMAZON_ASSOCIATE_TAG = process.env.NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG || 'nbacourtvisio-22'
 const RAKUTEN_AFFILIATE_ID = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || ''
 
 /** `:::shop キーワード` の行 */
