@@ -39,6 +39,7 @@ export const LABELS = {
   needsHuman: '要確認',
   hold: '保留',
   promo: 'マーケ:配信待ち',
+  posted: 'マーケ:配信済',
 } as const
 
 const LABEL_DEFS: { name: string; color: string; description: string }[] = [
@@ -52,6 +53,7 @@ const LABEL_DEFS: { name: string; color: string; description: string }[] = [
   { name: LABELS.needsHuman, color: 'b60205', description: '人間（社長）の判断が必要' },
   { name: LABELS.hold, color: '000000', description: 'このラベルがあるPRは自動マージしない' },
   { name: LABELS.promo, color: 'c5def5', description: 'マーケ担当が作った配信案（投稿待ち）' },
+  { name: LABELS.posted, color: 'bfd4f2', description: 'Xに投稿済みの配信案' },
 ]
 
 // ─── GitHub（gh CLI）──────────────────────────────────────────────────

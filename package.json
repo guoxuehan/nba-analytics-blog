@@ -24,7 +24,8 @@
     "newsroom:write": "tsx scripts/newsroom/writer.ts",
     "newsroom:score": "tsx scripts/newsroom/score.ts",
     "newsroom:publish": "tsx scripts/newsroom/publisher.ts",
-    "newsroom:weekly": "tsx scripts/newsroom/weekly-report.ts"
+    "newsroom:weekly": "tsx scripts/newsroom/weekly-report.ts",
+    "newsroom:social": "tsx scripts/newsroom/social.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
