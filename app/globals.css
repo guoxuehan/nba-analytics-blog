@@ -51,7 +51,7 @@
   --color-badge-bg:       var(--badge-bg);
   --color-badge-text:     var(--badge-text);
 
-  /* Fonts — next/font/google が --font-oswald / --font-source-sans を注入 */
+  /* Fonts — next/font/local（app/fonts/ の同梱フォント）が --font-oswald / --font-source-sans を注入 */
   --font-heading: var(--font-oswald), 'Noto Sans JP', sans-serif;
   --font-body:    var(--font-source-sans), 'Noto Sans JP', sans-serif;
 }

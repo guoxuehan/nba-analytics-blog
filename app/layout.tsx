@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { Oswald, Noto_Sans_JP } from 'next/font/google'
 import localFont from 'next/font/local'
 import Script from 'next/script'
 import { Providers } from './providers'
@@ -9,17 +8,19 @@ import { PageTransition } from './components/PageTransition'
 import './globals.css'
 import { SITE_URL } from '@/lib/constants'
 
-// 見出し: ESPN風コンデンスド書体
-const oswald = Oswald({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+// フォントはすべてリポジトリに同梱して読み込む。
+// Google Fonts からビルド時に取得すると、CI で取得に失敗してビルドが落ちることがあったため
+// （"next/font/google queries have exactly one entry"）
+
+// 見出し: ESPN風コンデンスド書体（可変フォント、latin, 400〜700）
+const oswald = localFont({
+  src: './fonts/oswald-latin.woff2',
+  weight: '400 700',
   variable: '--font-oswald',
   display: 'swap',
 })
 
-// 本文: エディトリアルな可読性重視
-// Google Fonts から取得すると、CI 環境でビルドが失敗した
-// （"next/font/google queries have exactly one entry"）ため、可変フォント（latin, 300〜700）を同梱して読み込む
+// 本文: エディトリアルな可読性重視（可変フォント、latin, 300〜700）
 const sourceSans = localFont({
   src: './fonts/source-sans-3-latin.woff2',
   weight: '300 700',
@@ -27,13 +28,9 @@ const sourceSans = localFont({
   display: 'swap',
 })
 
-// 日本語フォールバック
-const notoSansJP = Noto_Sans_JP({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  variable: '--font-noto-sans-jp',
-  display: 'swap',
-})
+// 日本語は globals.css の 'Noto Sans JP'（インストール済みなら使う）→ OS 標準の sans-serif で表示する。
+// 以前は next/font/google で Noto Sans JP を読み込んでいたが、next/font は別名で登録するため
+// CSS の 'Noto Sans JP' 指定とは一致せず、実際には使われていなかった
 
 export const metadata: Metadata = {
   title: {
@@ -71,7 +68,7 @@ export default function RootLayout({
     <html
       lang="ja"
       suppressHydrationWarning
-      className={`${oswald.variable} ${sourceSans.variable} ${notoSansJP.variable}`}
+      className={`${oswald.variable} ${sourceSans.variable}`}
     >
       <body className="min-h-screen flex flex-col bg-bg text-text-primary font-body antialiased">
         <Providers>
