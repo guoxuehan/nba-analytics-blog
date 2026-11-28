@@ -2,7 +2,7 @@
 
 import decidedAt from '@/data/viz/decided-at.json'
 import scoringClock from '@/data/viz/scoring-clock.json'
-import { DecidedAt, DecidedAtData, lateShare } from './DecidedAt'
+import { DecidedAt, DecidedAtData, earlyShare } from './DecidedAt'
 import { ScoringClock, ScoringClockData } from './ScoringClock'
 
 /** :::viz 名前 の1行を、対応する作品型の図にする。知らない名前は何も表示しない */
@@ -22,7 +22,7 @@ export function VizBlock({ name }: { name: string }) {
     return (
       <DecidedAt
         data={data}
-        title={`${lateShare(data).pct}%の試合は、第4Q残り5分を過ぎてから決まった`}
+        title={`${earlyShare(data).pct}%の試合は、前半のうちに決まっていた`}
         subtitle="1点＝1試合。勝ったチームが、その後一度もリードを譲らなかった時刻に置いた"
       />
     )

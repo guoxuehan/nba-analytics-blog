@@ -4,7 +4,8 @@ import { useState } from 'react'
 
 /**
  * ⏱ 試合はいつ決まるか: 1点＝1試合。勝ったチームが「その後一度もリードを譲らなかった」時刻に点を積む
- * 横軸は試合の48分（1分ごと）＋延長。第4Q残り5分以降と延長に決まった試合を強調する
+ * 横軸は試合の48分（1分ごと）＋延長。前半（24分まで）に決まった試合を強調する。
+ * 「終盤まで分からない」という思い込みに反して、約半数は前半で決まっている（2026-11 時点の集計）
  */
 export type DecidedAtData = {
   season: string
@@ -13,13 +14,13 @@ export type DecidedAtData = {
   decided: { id: string; t: number; ot: boolean; margin: number }[]
 }
 
-/** 強調する境目: 第4Q残り5分（試合開始から43分） */
-export const LATE_FROM = 43 * 60
+/** 強調する範囲: 前半（試合開始から24分まで）に決まった試合 */
+export const EARLY_UNTIL = 24 * 60
 
-export function lateShare(data: DecidedAtData): { late: number; total: number; pct: number } {
+export function earlyShare(data: DecidedAtData): { early: number; total: number; pct: number } {
   const total = data.decided.length
-  const late = data.decided.filter((g) => g.ot || g.t >= LATE_FROM).length
-  return { late, total, pct: total ? Math.round((late / total) * 100) : 0 }
+  const early = data.decided.filter((g) => !g.ot && g.t < EARLY_UNTIL).length
+  return { early, total, pct: total ? Math.round((early / total) * 100) : 0 }
 }
 
 const W = 640
@@ -49,12 +50,12 @@ export function DecidedAt({ data, title, subtitle }: { data: DecidedAtData; titl
   const step = Math.min(COL_W * 0.9, PLOT_H / max) // 点の縦の間隔
   const r = Math.max(1.6, Math.min(step, COL_W) * 0.42)
   const base = TOP + PLOT_H
-  const { late, total, pct } = lateShare(data)
-  const isLate = (c: number) => c >= 43
+  const { early, total, pct } = earlyShare(data)
+  const isEarly = (c: number) => c < 24
   const height = base + BOTTOM
 
   // 強調部分の上の注記位置
-  const lateTop = base - Math.max(...cols.slice(43)) * step - 10
+  const earlyTop = base - Math.max(...cols.slice(0, 24)) * step - 10
 
   return (
     <figure className="viz viz-decided" aria-label={`${title}。${subtitle}`}>
@@ -65,11 +66,11 @@ export function DecidedAt({ data, title, subtitle }: { data: DecidedAtData; titl
       <ul className="viz-legend" style={{ justifyContent: 'center' }} aria-hidden="true">
         <li>
           <span className="viz-key viz-key-dot" style={{ background: 'var(--viz-2)' }} />
-          第4Q残り5分以降・延長に決着
+          前半のうちに決着
         </li>
         <li>
           <span className="viz-key viz-key-dot" style={{ background: 'var(--viz-1-muted)' }} />
-          それより前に決着
+          後半・延長に決着
         </li>
       </ul>
       <div className="viz-plot" onPointerLeave={() => setHover(null)}>
@@ -97,7 +98,7 @@ export function DecidedAt({ data, title, subtitle }: { data: DecidedAtData; titl
                   cx={Math.round(colX(c) * 100) / 100}
                   cy={Math.round((base - step * (k + 0.5)) * 100) / 100}
                   r={Math.round(r * 100) / 100}
-                  fill={isLate(c) ? 'var(--viz-2)' : 'var(--viz-1-muted)'}
+                  fill={isEarly(c) ? 'var(--viz-2)' : 'var(--viz-1-muted)'}
                 />
               ))}
               {/* 当たり判定は列全体 */}
@@ -113,8 +114,8 @@ export function DecidedAt({ data, title, subtitle }: { data: DecidedAtData; titl
             </g>
           ))}
           {/* 強調部分の注記 */}
-          <text x={colX(45.5)} y={Math.max(14, lateTop)} className="viz-value viz-strong" textAnchor="middle">
-            {late}試合（{pct}%）
+          <text x={colX(11.5)} y={Math.max(14, earlyTop)} className="viz-value viz-strong" textAnchor="middle">
+            前半で決着 {early}試合（{pct}%）
           </text>
         </svg>
         {hover !== null && (
