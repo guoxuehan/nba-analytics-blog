@@ -95,7 +95,7 @@ export function ScoringClock({ data, title, subtitle }: { data: ScoringClockData
             return <line key={m} x1={x1} y1={y1} x2={x2} y2={y2} className={major ? 'viz-clock-major' : 'viz-clock-minor'} />
           })}
           {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => {
-            const [x, y] = polar(R0 * 0.78, ((i + 0.5) / 4) * 2 * Math.PI)
+            const [x, y] = polar(R0 * 0.8, ((i + 0.5) / 4) * 2 * Math.PI)
             return (
               <text key={q} x={x} y={y} className="viz-clock-q" textAnchor="middle" dominantBaseline="central">
                 {q}
@@ -105,12 +105,16 @@ export function ScoringClock({ data, title, subtitle }: { data: ScoringClockData
           {/* 中央の主役の数字（ホバー中はツールチップに譲る） */}
           {hover === null && (
             <g>
-              <text x={C} y={C - 8} className="viz-clock-hero" textAnchor="middle" dominantBaseline="central">
+              <text x={C} y={C - 30} className="viz-clock-hero" textAnchor="middle" dominantBaseline="central">
                 {buzzerPct >= 0 ? '+' : ''}
                 {buzzerPct}%
               </text>
-              <text x={C} y={C + 38} className="viz-clock-hero-label" textAnchor="middle">
-                ブザー前15秒の得点（通常時比）
+              {/* 文字盤の内側に収まるよう2行に分ける（スマホでは文字を大きくするため） */}
+              <text x={C} y={C + 36} className="viz-clock-hero-label" textAnchor="middle">
+                <tspan x={C}>ブザー前15秒の得点</tspan>
+                <tspan x={C} dy="1.35em">
+                  （通常時比）
+                </tspan>
               </text>
             </g>
           )}

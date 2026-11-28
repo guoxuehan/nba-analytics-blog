@@ -665,7 +665,7 @@ body {
 
 .viz-clock-hero {
   font-family: var(--font-body);
-  font-size: 64px;
+  font-size: 56px;
   font-weight: 800;
   letter-spacing: -0.02em;
   fill: var(--viz-1);
@@ -713,6 +713,6 @@ body {
     font-size: 26px;
   }
   .viz-clock-hero-label {
-    font-size: 22px;
+    font-size: 17px;
   }
 }

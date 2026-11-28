@@ -79,6 +79,63 @@ const PITCH_SCHEMA = {
   },
 }
 
+/**
+ * 発見データ: 図版の集計（data/viz/）から、「へー！」の種になる事実を1行ずつ作る。
+ * 試合経過を全試合ぶん自分たちで数えた数字なので、他のメディアにない切り口になる。
+ * 値はここで計算して丸める（記者・ライターは行をそのまま引用する）
+ */
+function buildDiscoverySheet(): string[] {
+  const read = <T,>(name: string): T | null => {
+    const file = path.resolve('data', 'viz', name)
+    return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf-8')) as T) : null
+  }
+  const pct = (a: number, b: number) => (b ? `${((a / b) * 100).toFixed(1)}%` : '-')
+  const lines: string[] = []
+
+  const clock = read<{ season: string; through: string; games: string[]; points: { pt3: number[]; pt2: number[]; ft: number[] } }>('scoring-clock.json')
+  if (clock && clock.games.length > 0) {
+    const n = clock.games.length
+    const { pt2, pt3, ft } = clock.points
+    const tot = pt2.map((_, i) => pt2[i] + pt3[i] + ft[i])
+    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
+    const head = `[発見 時刻 ${clock.season} ${clock.through}まで${n}試合]`
+    const all = sum(tot)
+    lines.push(`${head} 総得点 ${all}点（3P ${pct(sum(pt3), all)} / 2P ${pct(sum(pt2), all)} / フリースロー ${pct(sum(ft), all)}）`)
+    for (let q = 0; q < 4; q++) {
+      const seg = tot.slice(q * 48, q * 48 + 48)
+      lines.push(`${head} 第${q + 1}Qの得点 1試合あたり ${(sum(seg) / n).toFixed(1)}点 / 最初の15秒 ${seg[0]}点 / 最後の15秒 ${seg[47]}点`)
+    }
+    const normalBins = [0, 1, 2, 3].flatMap((q) => Array.from({ length: 36 }, (_, i) => q * 48 + 4 + i))
+    const normal = sum(normalBins.map((i) => tot[i])) / normalBins.length
+    const normal3 = sum(normalBins.map((i) => pt3[i])) / sum(normalBins.map((i) => tot[i]))
+    lines.push(`${head} 通常時（各Q 残り11:00〜3:00）の15秒あたりの得点 ${normal.toFixed(1)}点 / うち3Pの割合 ${(normal3 * 100).toFixed(1)}%`)
+    const labels = ['残り1:00〜0:45', '残り0:45〜0:30', '残り0:30〜0:15', '残り0:15〜0:00']
+    labels.forEach((label, k) => {
+      const bins = [0, 1, 2].map((q) => q * 48 + 44 + k)
+      const v = sum(bins.map((i) => tot[i])) / 3
+      const s3 = sum(bins.map((i) => pt3[i])) / sum(bins.map((i) => tot[i]))
+      lines.push(`${head} 第1〜第3Qの${label} 15秒あたり ${v.toFixed(1)}点（通常時比 ${v >= normal ? '+' : ''}${(((v / normal) - 1) * 100).toFixed(1)}%）/ うち3P ${(s3 * 100).toFixed(1)}%`)
+    })
+    const q4last2 = Array.from({ length: 8 }, (_, i) => 3 * 48 + 40 + i)
+    lines.push(`${head} 第4Q残り2分の得点 ${sum(q4last2.map((i) => tot[i]))}点のうちフリースロー ${pct(sum(q4last2.map((i) => ft[i])), sum(q4last2.map((i) => tot[i])))}（試合全体では ${pct(sum(ft), all)}）`)
+  }
+
+  const decided = read<{ season: string; through: string; decided: { t: number; ot: boolean; margin: number }[] }>('decided-at.json')
+  if (decided && decided.decided.length > 0) {
+    const d = decided.decided
+    const head = `[発見 決着 ${decided.season} ${decided.through}まで${d.length}試合]`
+    const firstHalf = (g: { t: number; ot: boolean }) => !g.ot && g.t < 1440
+    const late = (g: { t: number; ot: boolean }) => g.ot || g.t >= 43 * 60
+    lines.push(`${head} 勝ったチームが最後にリードを奪った時刻: 前半 ${d.filter(firstHalf).length}試合（${pct(d.filter(firstHalf).length, d.length)}）/ 第4Q残り5分以降・延長 ${d.filter(late).length}試合（${pct(d.filter(late).length, d.length)}）/ 延長 ${d.filter((g) => g.ot).length}試合`)
+    lines.push(`${head} 試合開始1分以内にリードを奪い、最後まで一度も譲らなかった試合 ${d.filter((g) => !g.ot && g.t < 60).length}試合`)
+    const close = d.filter((g) => g.margin <= 5)
+    const blowout = d.filter((g) => g.margin >= 15)
+    lines.push(`${head} 最終点差5点以内の試合 ${close.length}試合のうち、第4Q残り5分以降・延長に決着 ${pct(close.filter(late).length, close.length)} / 前半に決着 ${pct(close.filter(firstHalf).length, close.length)}`)
+    lines.push(`${head} 最終点差15点以上の試合 ${blowout.length}試合のうち、前半に決着 ${pct(blowout.filter(firstHalf).length, blowout.length)}`)
+  }
+  return lines
+}
+
 /** 取材データを「1行=1事実」のテキストにする。記者が引用できるのはこの行だけ */
 function buildDataSheet(data: NBALatestData, standings: StandingsData | null): string[] {
   const lines: string[] = []
@@ -174,7 +231,7 @@ export async function run(): Promise<number[]> {
       : []),
   ]
 
-  const sheetLines = buildDataSheet(data, standings)
+  const sheetLines = [...buildDataSheet(data, standings), ...buildDiscoverySheet()]
   const sheet = new Set(sheetLines)
   const count = DAILY_ARTICLE_COUNT + 2
 
