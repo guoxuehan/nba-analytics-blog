@@ -105,12 +105,16 @@ export function ScoringClock({ data, title, subtitle }: { data: ScoringClockData
           {/* 中央の主役の数字（ホバー中はツールチップに譲る） */}
           {hover === null && (
             <g>
-              <text x={C} y={C - 8} className="viz-clock-hero" textAnchor="middle" dominantBaseline="central">
+              <text x={C} y={C - 22} className="viz-clock-hero" textAnchor="middle" dominantBaseline="central">
                 {buzzerPct >= 0 ? '+' : ''}
                 {buzzerPct}%
               </text>
-              <text x={C} y={C + 38} className="viz-clock-hero-label" textAnchor="middle">
-                ブザー前15秒の得点（通常時比）
+              {/* 文字盤の内側に収まるよう2行に分ける（スマホでは文字を大きくするため） */}
+              <text x={C} y={C + 32} className="viz-clock-hero-label" textAnchor="middle">
+                <tspan x={C}>ブザー前15秒の得点</tspan>
+                <tspan x={C} dy="1.35em">
+                  （通常時比）
+                </tspan>
               </text>
             </g>
           )}
