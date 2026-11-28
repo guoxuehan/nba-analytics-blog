@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 import { parseDraft } from './_parse-draft'
 import type { DraftMeta } from './_parse-draft'
+import { stripCharts } from '../lib/chart'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
@@ -38,7 +39,8 @@ export function computeScore(filepath: string): number {
   const parsed = parseDraft(content)
   if (!parsed) return 0
 
-  const { meta, body } = parsed
+  const { meta } = parsed
+  const body = stripCharts(parsed.body) // グラフの JSON は文字数・文の長さに数えない
   let score = 0
 
   // 1. 文字数（15点/10点/5点）

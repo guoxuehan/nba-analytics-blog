@@ -1,4 +1,5 @@
 import { getSupabase } from '@/lib/supabase'
+import { stripCharts } from './chart'
 
 // ─── 型定義 ────────────────────────────────────────────────────
 
@@ -23,7 +24,7 @@ export type PostDetail = Post & {
 // ─── 読了時間（500字/分で計算） ───────────────────────────────
 
 export function calculateReadingTime(content: string): number {
-  const charCount = content.replace(/\s/g, '').length
+  const charCount = stripCharts(content).replace(/\s/g, '').length
   return Math.max(1, Math.ceil(charCount / 500))
 }
 

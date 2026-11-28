@@ -20,6 +20,8 @@ import {
   logUsageSummary,
   recordUsage,
 } from '../auto-generate'
+import { removeInvalidCharts, stripCharts } from '../../lib/chart'
+import { addCharts } from './graphics-desk'
 import { VALID_CATEGORIES, computeScore } from '../auto-publish'
 import { parseDraft } from '../_parse-draft'
 import {
@@ -108,7 +110,22 @@ async function main() {
   )
   const parsed = parseDraft(draft)
   if (!parsed) throw new Error(`原稿の形式が崩れています。先頭: ${draft.slice(0, 200)}`)
-  const { meta, body } = parsed
+  const { meta } = parsed
+  // ライターはグラフを書かない（図版デスクの担当）。紛れ込んだ崩れたブロックは外す
+  let { body } = removeInvalidCharts(parsed.body)
+
+  // 📈 図版デスク: 主張を支えるグラフを0〜2点入れる（失敗しても図なしで入稿する）
+  let graphics = '図なし'
+  try {
+    const result = await addCharts(body, notes, meta.title)
+    body = result.body
+    for (const d of result.dropped) console.warn(`  ⚠️  図版デスク: 図を外しました — ${d}`)
+    for (const a of result.added) console.log(`  📈 図版デスク: ${a.title}（${a.reason}）`)
+    graphics = result.added.length > 0 ? result.added.map((a) => `「${a.title}」`).join('、') : '図なし（不要と判断）'
+  } catch (err) {
+    console.warn(`  ⚠️  図版デスク: 失敗したため図なしで入稿します — ${err instanceof Error ? err.message : err}`)
+    graphics = '図なし（図版デスクが失敗）'
+  }
   if (!VALID_CATEGORIES.includes(meta.category)) {
     meta.category = issue.body.match(/newsroom:category=(\w+)/)?.[1] ?? 'player_analysis'
   }
@@ -124,7 +141,8 @@ async function main() {
   fs.writeFileSync(articlePath, serializeArticle({ meta: { ...meta, issue: issue.number }, body }), 'utf-8')
   fs.writeFileSync(notesPath, notes + '\n', 'utf-8')
   const score = computeScore(articlePath)
-  console.log(`  slug: ${meta.slug} / ${body.length}字 / スコア ${score}点`)
+  const charCount = stripCharts(body).length
+  console.log(`  slug: ${meta.slug} / ${charCount}字 / スコア ${score}点`)
 
   // ブランチを切って入稿
   const branch = `article/${meta.slug}`
@@ -134,7 +152,7 @@ async function main() {
   git(['push', '-u', 'origin', branch])
 
   const prBody = [
-    `✍️ ライターが入稿しました。校閲デスクがファクトチェックと校正を行います。`,
+    `✍️ ライターが入稿しました（📈 図版は図版デスク）。校閲デスクがファクトチェックと校正を行います。`,
     '',
     `Closes #${issue.number}`,
     '',
@@ -142,7 +160,8 @@ async function main() {
     '|---|---|',
     `| タイトル | ${meta.title} |`,
     `| カテゴリ | \`${meta.category}\` |`,
-    `| 文字数 | ${body.length}字 |`,
+    `| 文字数 | ${charCount}字 |`,
+    `| 図版 | ${graphics} |`,
     `| 品質スコア（機械判定） | ${score}点 |`,
     '',
     `**抜粋**: ${meta.excerpt}`,
@@ -160,7 +179,7 @@ async function main() {
   gh(['issue', 'edit', String(issue.number), '--remove-label', LABELS.approved, '--add-label', LABELS.written])
   dispatchWorkflow('newsroom-review.yml', { pr: prNumber })
 
-  appendSummary(`### ✍️ ライター\n- #${issue.number} → ${prUrl}（${body.length}字 / ${score}点）`)
+  appendSummary(`### ✍️ ライター\n- #${issue.number} → ${prUrl}（${charCount}字 / ${score}点 / 図版: ${graphics}）`)
   logUsageSummary()
 }
 

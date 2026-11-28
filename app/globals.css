@@ -425,3 +425,219 @@ body {
 .page-transition {
   animation: page-fade-in 0.25s ease-out both;
 }
+
+/* ─────────────────────────────────────────────
+   記事内グラフ（```chart ブロック → ArticleChart）
+   方眼紙の地に、細い線と少ない色。データだけが目立つ
+   ───────────────────────────────────────────── */
+.viz {
+  --viz-paper:      #FBFAF7;
+  --viz-grid-fine:  rgba(25, 25, 25, 0.045);
+  --viz-grid-major: rgba(25, 25, 25, 0.08);
+  --viz-ink:        #191919;
+  --viz-ink-2:      #666666;
+  --viz-gridline:   #E7E7E7;
+  --viz-axisline:   #C2C2C2;
+  --viz-1:          #257DE0;
+  --viz-1-muted:    #9DC8F7;
+  --viz-2:          #F47230;
+  --viz-3:          #00B894;
+  position: relative;
+  margin: 2rem 0;
+  padding: 1.25rem 1rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--viz-paper);
+  background-image:
+    linear-gradient(var(--viz-grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--viz-grid-major) 1px, transparent 1px),
+    linear-gradient(var(--viz-grid-fine) 1px, transparent 1px),
+    linear-gradient(90deg, var(--viz-grid-fine) 1px, transparent 1px);
+  background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+  color: var(--viz-ink);
+  font-family: var(--font-body);
+}
+
+.dark .viz {
+  --viz-paper:      #161616;
+  --viz-grid-fine:  rgba(255, 255, 255, 0.035);
+  --viz-grid-major: rgba(255, 255, 255, 0.07);
+  --viz-ink:        #EFEFEF;
+  --viz-ink-2:      #9C9C9C;
+  --viz-gridline:   #303030;
+  --viz-axisline:   #474747;
+  --viz-1:          #338CED;
+  --viz-1-muted:    #0E3D7E;
+  --viz-2:          #E76624;
+  --viz-3:          #00A888;
+}
+
+.article-prose .viz figcaption.viz-head {
+  display: block;
+  margin: 0 0 0.75rem;
+  text-align: left;
+  font-style: normal;
+}
+
+.viz-title {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--viz-ink);
+}
+
+.viz-subtitle {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 13px;
+  color: var(--viz-ink-2);
+}
+
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0 0 0.5rem !important;
+  padding: 0 !important;
+  list-style: none;
+  font-size: 13px;
+  color: var(--viz-ink-2);
+}
+
+.viz-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.viz-legend li::before {
+  content: none !important;
+}
+
+.viz-key {
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.viz-plot {
+  position: relative;
+  width: 100%;
+  touch-action: pan-y;
+}
+
+.viz-plot svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--font-body);
+}
+
+.viz-tick,
+.viz-label,
+.viz-value {
+  font-size: 13px;
+  fill: var(--viz-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-label,
+.viz-value {
+  fill: var(--viz-ink);
+}
+
+.viz-strong {
+  font-weight: 700;
+}
+
+.viz-grid {
+  stroke: var(--viz-gridline);
+  stroke-width: 1;
+}
+
+.viz-axis {
+  stroke: var(--viz-axisline);
+  stroke-width: 1;
+}
+
+.viz-crosshair {
+  stroke: var(--viz-axisline);
+  stroke-width: 1;
+}
+
+.viz-dot {
+  stroke: var(--viz-paper);
+  stroke-width: 2;
+}
+
+.viz-tip {
+  position: absolute;
+  z-index: 2;
+  min-width: 120px;
+  max-width: 200px;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--viz-ink);
+  pointer-events: none;
+}
+
+.viz-tip-title {
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+}
+
+.viz-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.viz-tip-name {
+  color: var(--viz-ink-2);
+}
+
+.viz-tip-value {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-source {
+  margin: 0.75rem 0 0 !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  color: var(--viz-ink-2) !important;
+}
+
+.viz-table {
+  margin-top: 0.25rem;
+  font-size: 12px;
+  color: var(--viz-ink-2);
+}
+
+.viz-table summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.article-prose .viz-table table {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 13px;
+  background: var(--bg);
+}
+
+.article-prose .viz-table td {
+  font-variant-numeric: tabular-nums;
+}

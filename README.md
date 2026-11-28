@@ -128,12 +128,12 @@ E2EテストはChromiumを使用する。初回は `npx playwright install chrom
 
 ## 編集部（AIエージェントによる記事制作）
 
-記者 → 編集長 → ライター → 校閲デスク → 公開 → マーケ担当の流れを、GitHub の Issue・PR・Actions 上で自動で回している。企画は Issue、入稿は PR、公開はマージで行う。
+記者 → 編集長 → ライター → 図版デスク → 校閲デスク → 公開 → マーケ担当の流れを、GitHub の Issue・PR・Actions 上で自動で回している。企画は Issue、入稿は PR、公開はマージで行う。
 
 | 段階 | ワークフロー | 成果物 |
 |---|---|---|
 | 朝会（記者・編集長） | `newsroom-daily.yml`（毎日 JST 18:00） | 企画 Issue（`企画:候補` → `企画:採用` / `企画:不採用`） |
-| 執筆（ライター） | `newsroom-write.yml` | 記事PR（`content/articles/`） |
+| 執筆（ライター・図版デスク） | `newsroom-write.yml` | 記事PR（`content/articles/`、グラフは ```` ```chart ```` ブロック） |
 | 校閲（校閲デスク・デスク判定） | `newsroom-review.yml` | 修正コミット、レポート、自動マージ |
 | 公開（マーケ担当） | `newsroom-publish.yml` | Supabase への反映、配信 Issue |
 | 週次レポート（経営企画） | `newsroom-weekly.yml`（毎週月曜 JST 9:00） | 週次レポート Issue |
