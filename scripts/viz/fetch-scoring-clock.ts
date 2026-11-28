@@ -1,7 +1,7 @@
 /**
  * 🕐 時計図のデータ: 今季のレギュラーシーズン全試合の全得点を、入った時刻（試合経過）ごとに数える
  *
- * - 出典: cdn.nba.com の試合経過データ（play-by-play）
+ * - 出典: ESPN の試合経過データ（play-by-play）。cdn.nba.com は GitHub Actions から 403 になるため使わない
  * - 15秒刻み（48分 = 192 区間）で、3P・2P・フリースローの得点を合計する
  * - 延長戦は除く（4クォーター48分の時計に載らないため）
  * - 前回の結果に、まだ数えていない試合だけを足す（毎日の実行で増分更新）
@@ -15,35 +15,36 @@ import * as path from 'path'
 const OUT = path.join(process.cwd(), 'data', 'viz', 'scoring-clock.json')
 const BIN_SEC = 15
 const BINS = (48 * 60) / BIN_SEC
+const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
 const HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   Accept: 'application/json',
-  Referer: 'https://www.nba.com/',
 }
 
 export type ScoringClock = {
   season: string
-  through: string // 最後に数えた試合の日付（YYYY-MM-DD, 米国東部）
+  through: string // 最後に数えた試合の日付（YYYY-MM-DD, 米国の試合日）
   binSeconds: number
-  games: string[] // 数えた試合の gameId
+  games: string[] // 数えた試合の ESPN event id
   points: { pt3: number[]; pt2: number[]; ft: number[] } // 各区間の得点合計
   otExcluded: number // 除いた延長戦の得点
 }
 
-type Schedule = {
-  leagueSchedule: {
-    seasonYear: string
-    gameDates: { gameDate: string; games: { gameId: string; gameStatus: number; gameDateEst?: string }[] }[]
-  }
+type Scoreboard = {
+  events?: {
+    id: string
+    date: string
+    season: { year: number; type: number } // type 2 = レギュラーシーズン
+    status: { type: { completed: boolean } }
+  }[]
 }
 
-type Action = {
-  period: number
-  clock: string // "PT11M42.00S"
-  actionType: string
-  scoreHome: string
-  scoreAway: string
+type Play = {
+  period: { number: number }
+  clock: { displayValue: string } // "11:42" や "45.3"
+  scoringPlay?: boolean
+  scoreValue?: number
 }
 
 async function getJson<T>(url: string): Promise<T> {
@@ -55,10 +56,10 @@ async function getJson<T>(url: string): Promise<T> {
   }
 }
 
-/** "PT11M42.00S" → 残り秒数 */
-function clockSeconds(clock: string): number | null {
-  const m = clock.match(/PT(\d+)M([\d.]+)S/)
-  return m ? parseInt(m[1], 10) * 60 + parseFloat(m[2]) : null
+/** "11:42" / "45.3" → 残り秒数 */
+function clockSeconds(display: string): number | null {
+  const m = display.match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/)
+  return m ? (m[1] ? parseInt(m[1], 10) * 60 : 0) + parseFloat(m[2]) : null
 }
 
 function emptyClock(season: string): ScoringClock {
@@ -66,50 +67,57 @@ function emptyClock(season: string): ScoringClock {
   return { season, through: '', binSeconds: BIN_SEC, games: [], points: { pt3: zeros(), pt2: zeros(), ft: zeros() }, otExcluded: 0 }
 }
 
+const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '')
+
+/** NBA のシーズン表記（2026-27 シーズンは ESPN の year=2027） */
+const seasonLabel = (year: number) => `${year - 1}-${String(year).slice(2)}`
+
 async function main() {
-  const schedule = await getJson<Schedule>('https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json')
-  const season = schedule.leagueSchedule.seasonYear
-  const finished = schedule.leagueSchedule.gameDates
-    .flatMap((d) => d.games.map((g) => ({ ...g, date: d.gameDate })))
-    .filter((g) => g.gameId.startsWith('002') && g.gameStatus === 3) // レギュラーシーズンの終了済み試合
+  // 10月1日（今季の開幕前）から昨日までの日付ごとに、終了済みのレギュラーシーズン試合を集める
+  const now = new Date()
+  const startYear = now.getUTCMonth() >= 7 ? now.getUTCFullYear() : now.getUTCFullYear() - 1
+  const finished: { id: string; date: string; season: number }[] = []
+  for (let d = new Date(Date.UTC(startYear, 9, 1)); d < now; d.setUTCDate(d.getUTCDate() + 1)) {
+    const sb = await getJson<Scoreboard>(`${ESPN}/scoreboard?dates=${ymd(d)}`)
+    for (const e of sb.events ?? []) {
+      if (e.season.type === 2 && e.status.type.completed) finished.push({ id: e.id, date: d.toISOString().slice(0, 10), season: e.season.year })
+    }
+    await new Promise((r) => setTimeout(r, 100))
+  }
+  if (finished.length === 0) throw new Error('終了済みの試合が見つかりません')
+  const season = seasonLabel(Math.max(...finished.map((g) => g.season)))
 
   let data = fs.existsSync(OUT) ? (JSON.parse(fs.readFileSync(OUT, 'utf-8')) as ScoringClock) : emptyClock(season)
   if (data.season !== season || data.binSeconds !== BIN_SEC) data = emptyClock(season)
   const done = new Set(data.games)
-  const todo = finished.filter((g) => !done.has(g.gameId))
+  const todo = finished.filter((g) => !done.has(g.id))
   console.log(`🕐 ${season}: 終了済み ${finished.length}試合 / 未集計 ${todo.length}試合`)
 
   let failed = 0
   for (const g of todo) {
     try {
-      const pbp = await getJson<{ game: { actions: Action[] } }>(
-        `https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_${g.gameId}.json`,
-      )
-      let prev = 0
-      for (const a of pbp.game.actions) {
-        const total = (parseInt(a.scoreHome, 10) || 0) + (parseInt(a.scoreAway, 10) || 0)
-        const delta = total - prev
-        if (delta <= 0) continue
-        prev = total
-        if (a.period > 4) {
-          data.otExcluded += delta
+      const summary = await getJson<{ plays?: Play[] }>(`${ESPN}/summary?event=${g.id}`)
+      const plays = summary.plays ?? []
+      if (plays.length === 0) throw new Error('試合経過データがありません')
+      for (const p of plays) {
+        const pts = p.scoringPlay ? p.scoreValue ?? 0 : 0
+        if (pts <= 0) continue
+        if (p.period.number > 4) {
+          data.otExcluded += pts
           continue
         }
-        const left = clockSeconds(a.clock)
+        const left = clockSeconds(p.clock.displayValue)
         if (left === null) continue
-        const elapsed = (a.period - 1) * 720 + (720 - left)
+        const elapsed = (p.period.number - 1) * 720 + (720 - left)
         const bin = Math.min(BINS - 1, Math.max(0, Math.floor(elapsed / BIN_SEC)))
-        const kind = a.actionType === '3pt' ? 'pt3' : a.actionType === 'freethrow' ? 'ft' : 'pt2'
-        data.points[kind][bin] += delta
+        const kind = pts === 3 ? 'pt3' : pts === 1 ? 'ft' : 'pt2'
+        data.points[kind][bin] += pts
       }
-      data.games.push(g.gameId)
-      if (g.date) {
-        const d = new Date(g.date).toISOString().slice(0, 10)
-        if (d > data.through) data.through = d
-      }
+      data.games.push(g.id)
+      if (g.date > data.through) data.through = g.date
     } catch (err) {
       failed++
-      console.warn(`  ⚠️  ${g.gameId}: ${err instanceof Error ? err.message : err}`)
+      console.warn(`  ⚠️  ${g.id}: ${err instanceof Error ? err.message : err}`)
     }
     await new Promise((r) => setTimeout(r, 150))
   }

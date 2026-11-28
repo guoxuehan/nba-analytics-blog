@@ -142,7 +142,7 @@ export function ScoringClock({ data, title, subtitle }: { data: ScoringClockData
         )}
       </div>
       <p className="viz-source">
-        {data.season} レギュラーシーズン {data.through} まで・{games.toLocaleString('ja-JP')}試合・15秒ごと・延長戦は除外・出典: NBA.com（試合経過データ）
+        {data.season} レギュラーシーズン {data.through} まで・{games.toLocaleString('ja-JP')}試合・15秒ごと・延長戦は除外・出典: ESPN（試合経過データ）
       </p>
     </figure>
   )
