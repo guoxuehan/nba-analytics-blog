@@ -5,6 +5,8 @@ import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
 import { SHOP_LINE } from '@/lib/affiliates'
 import { CHART_BLOCK, ChartSpec, parseChart } from '@/lib/chart'
+import { VIZ_LINE } from '@/lib/viz'
+import { VizBlock } from './VizBlock'
 import { ArticleChart } from './ArticleChart'
 import { ShopBox } from './ShopBox'
 
@@ -28,15 +30,17 @@ type Part =
   | { type: 'md'; text: string }
   | { type: 'shop'; keyword: string }
   | { type: 'chart'; spec: ChartSpec }
+  | { type: 'viz'; name: string }
 
 /**
- * 本文を Markdown・`:::shop キーワード` の行（関連商品の枠）・```chart ブロック（グラフ）に分ける。
+ * 本文を Markdown・`:::shop キーワード` の行（関連商品の枠）・```chart ブロック（グラフ）・`:::viz 名前` の行（作品型の図）に分ける。
  * 形式の崩れた chart ブロックは何も表示しない（読者に JSON を見せない）
  */
 function splitParts(content: string): Part[] {
   const blocks = [
     ...[...content.matchAll(new RegExp(SHOP_LINE.source, 'gm'))].map((m) => ({ m, kind: 'shop' as const })),
     ...[...content.matchAll(new RegExp(CHART_BLOCK.source, 'gm'))].map((m) => ({ m, kind: 'chart' as const })),
+    ...[...content.matchAll(new RegExp(VIZ_LINE.source, 'gm'))].map((m) => ({ m, kind: 'viz' as const })),
   ].sort((a, b) => a.m.index! - b.m.index!)
 
   const parts: Part[] = []
@@ -46,6 +50,8 @@ function splitParts(content: string): Part[] {
     parts.push({ type: 'md', text: content.slice(last, m.index) })
     if (kind === 'shop') {
       parts.push({ type: 'shop', keyword: m[1] })
+    } else if (kind === 'viz') {
+      parts.push({ type: 'viz', name: m[1] })
     } else {
       const result = parseChart(m[1])
       if ('spec' in result) parts.push({ type: 'chart', spec: result.spec })
@@ -65,6 +71,8 @@ export function ArticleContent({ content }: Props) {
           <ShopBox key={i} keyword={part.keyword} />
         ) : part.type === 'chart' ? (
           <ArticleChart key={i} spec={part.spec} />
+        ) : part.type === 'viz' ? (
+          <VizBlock key={i} name={part.name} />
         ) : (
           <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={components}>
             {part.text}

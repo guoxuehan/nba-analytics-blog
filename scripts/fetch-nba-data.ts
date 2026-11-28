@@ -70,6 +70,8 @@ export type NBALatestData = {
   games: GameSummary[]
   topScorers: TopScorer[]
   dataSource: string
+  /** 取得に失敗したリクエスト（「ホスト 状態」）。0件でも成功した取得元は含まない。健康診断が読む */
+  fetchErrors?: string[]
 }
 
 export type NBAStandingTeam = {
@@ -231,19 +233,24 @@ function ensureDataDir(): void {
   }
 }
 
+const fetchErrors: string[] = []
+
 async function fetchJson<T>(
   url: string,
   headers: Record<string, string> = {},
 ): Promise<T | null> {
+  const host = new URL(url).host
   try {
     const res = await fetch(url, { headers })
     if (!res.ok) {
       console.warn(`  ⚠️  HTTP ${res.status}: ${url}`)
+      fetchErrors.push(`${host} HTTP ${res.status}`)
       return null
     }
     return (await res.json()) as T
   } catch (err) {
     console.warn(`  ⚠️  fetch失敗: ${url} - ${err instanceof Error ? err.message : String(err)}`)
+    fetchErrors.push(`${host} 接続失敗`)
     return null
   }
 }
@@ -647,6 +654,7 @@ export async function run() {
     games,
     topScorers,
     dataSource,
+    fetchErrors: [...new Set(fetchErrors)],
   }
 
   fs.writeFileSync(

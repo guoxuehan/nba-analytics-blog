@@ -26,9 +26,11 @@ const C = SIZE / 2
 const R0 = 150 // 文字盤の半径
 const R_MAX = 145 // 棒の最大長
 
+const round = (v: number) => Math.round(v * 100) / 100
+
 function polar(r: number, angle: number): [number, number] {
-  // angle: 0 = 12時、時計回り（ラジアン）
-  return [C + r * Math.sin(angle), C - r * Math.cos(angle)]
+  // angle: 0 = 12時、時計回り（ラジアン）。サーバーとブラウザで三角関数の末尾の桁が違うので丸める
+  return [round(C + r * Math.sin(angle)), round(C - r * Math.cos(angle))]
 }
 
 /** 扇形の棒（r1〜r2、角度 a1〜a2） */
@@ -37,7 +39,7 @@ function wedge(r1: number, r2: number, a1: number, a2: number): string {
   const [x2, y2] = polar(r2, a1)
   const [x3, y3] = polar(r2, a2)
   const [x4, y4] = polar(r1, a2)
-  return `M${x1},${y1}L${x2},${y2}A${r2},${r2} 0 0 1 ${x3},${y3}L${x4},${y4}A${r1},${r1} 0 0 0 ${x1},${y1}Z`
+  return `M${x1},${y1}L${x2},${y2}A${round(r2)},${round(r2)} 0 0 1 ${x3},${y3}L${x4},${y4}A${round(r1)},${round(r1)} 0 0 0 ${x1},${y1}Z`
 }
 
 /** 区間 i の時刻表示（「第4Q 残り0:15〜0:00」） */

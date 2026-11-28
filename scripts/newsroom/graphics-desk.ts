@@ -7,6 +7,7 @@
  */
 import { MODEL } from '../auto-generate'
 import { ChartSpec, parseChart } from '../../lib/chart'
+import { VIZ_CATALOG } from '../../lib/viz'
 import { callJson, loadPersona } from './_lib'
 
 const MAX_CHARTS = 2
@@ -27,8 +28,22 @@ type Proposal = {
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['charts'],
+  required: ['charts', 'viz'],
   properties: {
+    viz: {
+      type: 'array',
+      description: '作品型の図（0〜1件）',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'after', 'reason'],
+        properties: {
+          name: { type: 'string', enum: Object.keys(VIZ_CATALOG) },
+          after: { type: 'string', description: '図を置く直前の本文の1文（原文のまま）' },
+          reason: { type: 'string' },
+        },
+      },
+    },
     charts: {
       type: 'array',
       items: {
@@ -82,7 +97,8 @@ export async function addCharts(
   notes: string,
   title: string,
 ): Promise<{ body: string; added: { title: string; reason: string }[]; dropped: string[] }> {
-  const { charts } = await callJson<{ charts: Proposal[] }>({
+  const catalog = Object.entries(VIZ_CATALOG).map(([name, v]) => `- ${name}: ${v.what}（使うとき: ${v.useWhen}）`)
+  const { charts, viz } = await callJson<{ charts: Proposal[]; viz: { name: string; after: string; reason: string }[] }>({
     model: MODEL,
     system: loadPersona('graphics-desk'),
     user: [
@@ -95,6 +111,11 @@ export async function addCharts(
       '---',
       '',
       notes,
+      '',
+      '---',
+      '',
+      '# 作品型の図の一覧（`:::viz 名前` で入れる。主題に合わなければ viz は空にする）',
+      ...catalog,
     ].join('\n'),
     schema: SCHEMA,
     effort: 'medium',
@@ -136,6 +157,18 @@ export async function addCharts(
     const block = ['```chart', JSON.stringify(spec), '```'].join('\n')
     inserts.set(at, [...(inserts.get(at) ?? []), block])
     added.push({ title: spec.title, reason: c.reason })
+  }
+
+  for (const v of viz.slice(0, 1)) {
+    if (!VIZ_CATALOG[v.name]) continue
+    const at = findAnchor(paragraphs, v.after)
+    if (at < 0) {
+      dropped.push(`:::viz ${v.name}: 置き場所の文が本文に見つからない`)
+      continue
+    }
+    // 作品型の図は、同じ段落に入る ```chart より前に置く（全体像 → 拡大の順）
+    inserts.set(at, [`:::viz ${v.name}`, ...(inserts.get(at) ?? [])])
+    added.unshift({ title: `作品型の図: ${v.name}`, reason: v.reason })
   }
 
   const out = paragraphs.flatMap((p, i) => [p, ...(inserts.get(i) ?? [])])

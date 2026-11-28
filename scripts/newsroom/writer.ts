@@ -22,6 +22,7 @@ import {
 } from '../auto-generate'
 import { removeInvalidCharts, stripCharts } from '../../lib/chart'
 import { addCharts } from './graphics-desk'
+import { removeUnknownViz } from '../../lib/viz'
 import { VALID_CATEGORIES, computeScore } from '../auto-publish'
 import { parseDraft } from '../_parse-draft'
 import {
@@ -112,7 +113,7 @@ async function main() {
   if (!parsed) throw new Error(`原稿の形式が崩れています。先頭: ${draft.slice(0, 200)}`)
   const { meta } = parsed
   // ライターはグラフを書かない（図版デスクの担当）。紛れ込んだ崩れたブロックは外す
-  let { body } = removeInvalidCharts(parsed.body)
+  let { body } = removeInvalidCharts(removeUnknownViz(parsed.body).body)
 
   // 📈 図版デスク: 主張を支えるグラフを0〜2点入れる（失敗しても図なしで入稿する）
   let graphics = '図なし'

@@ -670,3 +670,11 @@ body {
   font-weight: 700;
   fill: var(--viz-ink);
 }
+
+.viz-clock .viz-tip {
+  min-width: 200px;
+}
+
+.viz-clock .viz-tip-name {
+  white-space: nowrap;
+}
