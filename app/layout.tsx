@@ -5,6 +5,10 @@ import { Providers } from './providers'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { PageTransition } from './components/PageTransition'
+// 日本語と本文: LINE Seed JP（npm の @fontsource で同梱。日本語は文字の範囲ごとに分割され、使う分だけ読み込まれる）
+import '@fontsource/line-seed-jp/400.css'
+import '@fontsource/line-seed-jp/700.css'
+import '@fontsource/line-seed-jp/800.css'
 import './globals.css'
 import { SITE_URL } from '@/lib/constants'
 
@@ -28,9 +32,8 @@ const sourceSans = localFont({
   display: 'swap',
 })
 
-// 日本語は globals.css の 'Noto Sans JP'（インストール済みなら使う）→ OS 標準の sans-serif で表示する。
-// 以前は next/font/google で Noto Sans JP を読み込んでいたが、next/font は別名で登録するため
-// CSS の 'Noto Sans JP' 指定とは一致せず、実際には使われていなかった
+// 日本語は LINE Seed JP（上の @fontsource の import）。以前は Noto Sans JP を指定していたが、
+// 読み込み方の都合で実際には使われず、端末の標準フォントで表示されていた
 
 export const metadata: Metadata = {
   title: {

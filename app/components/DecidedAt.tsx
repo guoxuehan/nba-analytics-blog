@@ -28,7 +28,7 @@ const COLS = 49 // 48分 + 延長
 const LEFT = 8
 const COL_W = (W - LEFT * 2) / (COLS + 0.6) // 延長の前に少し間をあける
 const PLOT_H = 260
-const TOP = 34
+const TOP = 56
 const BOTTOM = 40
 
 const colX = (c: number) => LEFT + (c + (c === 48 ? 0.6 : 0)) * COL_W + COL_W / 2
@@ -63,16 +63,6 @@ export function DecidedAt({ data, title, subtitle }: { data: DecidedAtData; titl
         <span className="viz-title">{title}</span>
         <span className="viz-subtitle">{subtitle}</span>
       </figcaption>
-      <ul className="viz-legend" style={{ justifyContent: 'center' }} aria-hidden="true">
-        <li>
-          <span className="viz-key viz-key-dot" style={{ background: 'var(--viz-2)' }} />
-          前半のうちに決着
-        </li>
-        <li>
-          <span className="viz-key viz-key-dot" style={{ background: 'var(--viz-1-muted)' }} />
-          後半・延長に決着
-        </li>
-      </ul>
       <div className="viz-plot" onPointerLeave={() => setHover(null)}>
         <svg viewBox={`0 0 ${W} ${height}`} width="100%" role="img" aria-hidden="true">
           {/* クォーターの区切り */}
@@ -98,7 +88,7 @@ export function DecidedAt({ data, title, subtitle }: { data: DecidedAtData; titl
                   cx={Math.round(colX(c) * 100) / 100}
                   cy={Math.round((base - step * (k + 0.5)) * 100) / 100}
                   r={Math.round(r * 100) / 100}
-                  fill={isEarly(c) ? 'var(--viz-2)' : 'var(--viz-1-muted)'}
+                  fill={isEarly(c) ? 'var(--viz-1)' : 'var(--viz-1-muted)'}
                 />
               ))}
               {/* 当たり判定は列全体 */}
@@ -113,10 +103,27 @@ export function DecidedAt({ data, title, subtitle }: { data: DecidedAtData; titl
               />
             </g>
           ))}
-          {/* 強調部分の注記 */}
-          <text x={colX(11.5)} y={Math.max(14, earlyTop)} className="viz-value viz-strong" textAnchor="middle">
-            前半で決着 {early}試合（{pct}%）
-          </text>
+          {/* 注記（凡例の代わりに、範囲を括弧で示して直接書く） */}
+          {(() => {
+            const y1 = Math.max(26, earlyTop)
+            const x0 = colX(0) - COL_W / 2
+            const x1 = colX(23) + COL_W / 2
+            const lateTopY = Math.max(26, base - Math.max(...cols.slice(24)) * step - 10)
+            const x2 = colX(24) - COL_W / 2
+            const x3 = colX(48) + COL_W / 2
+            return (
+              <>
+                <path d={`M${x0},${y1 + 6}V${y1}H${x1}V${y1 + 6}`} className="viz-annot-line viz-annot-accent" />
+                <text x={(x0 + x1) / 2} y={y1 - 8} className="viz-value viz-strong" textAnchor="middle">
+                  前半で決着　{early}試合（{pct}%）
+                </text>
+                <path d={`M${x2},${lateTopY + 6}V${lateTopY}H${x3}V${lateTopY + 6}`} className="viz-annot-line" />
+                <text x={(x2 + x3) / 2} y={lateTopY - 8} className="viz-tick" textAnchor="middle">
+                  後半・延長で決着　{total - early}試合
+                </text>
+              </>
+            )
+          })()}
         </svg>
         {hover !== null && (
           <div className="viz-tip" style={{ left: Math.max(0, Math.min(colX(hover) / W, 0.7)) * 100 + '%', top: 0 }}>

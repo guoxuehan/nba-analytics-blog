@@ -144,7 +144,7 @@ export function Header() {
         <Link
           href="/"
           className="font-heading text-xl font-bold uppercase text-text-primary hover:text-accent transition-colors duration-150 shrink-0"
-          style={{ letterSpacing: '0.1em' }}
+          style={{ fontFamily: 'var(--font-logo)', letterSpacing: '0.1em' }}
         >
           NBA COURT VISION
         </Link>

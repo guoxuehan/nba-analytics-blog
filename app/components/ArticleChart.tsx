@@ -5,8 +5,8 @@ import { ChartSpec, formatValue, niceTicks } from '@/lib/chart'
 
 // ─── 寸法 ───────────────────────────────────────────────────────────
 const FONT = 13 // 軸・ラベルの文字サイズ（px）
-const BAR = 20 // 棒の太さ（24px 以下）
-const ROW = 34 // 横棒1本ぶんの行の高さ
+const BAR = 14 // 棒の太さ（24px 以下）
+const ROW = 30 // 横棒1本ぶんの行の高さ（項目名の行は別）
 const LINE_H = 260 // 折れ線のプロット高さ
 const SERIES = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)']
 
@@ -130,22 +130,23 @@ function BarChart({ spec, width, hover, setHover, setTip }: PlotProps) {
   const values = spec.series[0].values
   const valueLabels = values.map((v) => formatValue(v, spec.unit))
   const naturalLabelW = Math.max(...spec.x.map((x) => textWidth(x))) + 8
-  // 項目名が横に収まらない（スマホ幅など）ときは、名前を棒の上の行に置く
-  const stacked = naturalLabelW > width * 0.38
+  // 項目名は棒の上の行に置く（項目名の長さに左右されず、棒の長さを横幅いっぱいに使える）
+  const stacked = true
+  void naturalLabelW
   const labelW = stacked ? 0 : naturalLabelW
   const valueW = Math.max(...valueLabels.map((v) => textWidth(v))) + 8
   const plotX = labelW
   const plotW = Math.max(40, width - labelW - valueW)
   const max = Math.max(...values) || 1
-  const rowH = stacked ? ROW + FONT + 6 : ROW
+  const rowH = stacked ? FONT + 8 + BAR + 16 : ROW // 項目名 → すき間 → 棒 → 次の行までの余白
   const height = spec.x.length * rowH
   const anyHighlight = spec.highlight !== undefined
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-hidden="true">
-      <line x1={plotX} x2={plotX} y1={stacked ? FONT + 6 : 0} y2={height} className="viz-axis" />
+      {!stacked && <line x1={plotX} x2={plotX} y1={0} y2={height} className="viz-axis" />}
       {spec.x.map((x, i) => {
-        const y = i * rowH + (stacked ? FONT + 6 : 0) + (ROW - BAR) / 2
+        const y = stacked ? i * rowH + FONT + 8 : i * rowH + (ROW - BAR) / 2
         const len = Math.max(1, (values[i] / max) * plotW)
         const strong = !anyHighlight || spec.highlight === x
         const show = () => {

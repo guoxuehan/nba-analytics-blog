@@ -16,7 +16,7 @@ export type ScoringClockData = {
 }
 
 const KINDS = [
-  { key: 'pt2', name: '2P', color: 'var(--viz-1)' },
+  { key: 'pt2', name: '2P', color: 'var(--viz-1-muted)' },
   { key: 'pt3', name: '3P', color: 'var(--viz-2)' },
   { key: 'ft', name: 'フリースロー', color: 'var(--viz-3)' },
 ] as const
@@ -60,6 +60,12 @@ export function ScoringClock({ data, title, subtitle }: { data: ScoringClockData
   const step = (2 * Math.PI) / bins
   const gap = step * 0.18 // 隣の棒とのすき間
   const peak = totals.indexOf(max)
+  // 中央の数字: 第1〜第3Qの最後の15秒は、通常時（各Q 残り11:00〜3:00）より何%多いか
+  const perQ = bins / 4
+  const normal = [0, 1, 2, 3].flatMap((q) => totals.slice(q * perQ + 4, q * perQ + perQ - 12))
+  const normalAvg = normal.reduce((a, b) => a + b, 0) / (normal.length || 1)
+  const buzzerAvg = [0, 1, 2].reduce((a, q) => a + totals[q * perQ + perQ - 1], 0) / 3
+  const buzzerPct = Math.round((buzzerAvg / normalAvg - 1) * 100)
   const games = data.games.length
   const perGame = (v: number) => (v / games).toFixed(2)
 
@@ -89,13 +95,25 @@ export function ScoringClock({ data, title, subtitle }: { data: ScoringClockData
             return <line key={m} x1={x1} y1={y1} x2={x2} y2={y2} className={major ? 'viz-clock-major' : 'viz-clock-minor'} />
           })}
           {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => {
-            const [x, y] = polar(R0 * 0.55, ((i + 0.5) / 4) * 2 * Math.PI)
+            const [x, y] = polar(R0 * 0.78, ((i + 0.5) / 4) * 2 * Math.PI)
             return (
               <text key={q} x={x} y={y} className="viz-clock-q" textAnchor="middle" dominantBaseline="central">
                 {q}
               </text>
             )
           })}
+          {/* 中央の主役の数字（ホバー中はツールチップに譲る） */}
+          {hover === null && (
+            <g>
+              <text x={C} y={C - 8} className="viz-clock-hero" textAnchor="middle" dominantBaseline="central">
+                {buzzerPct >= 0 ? '+' : ''}
+                {buzzerPct}%
+              </text>
+              <text x={C} y={C + 38} className="viz-clock-hero-label" textAnchor="middle">
+                ブザー前15秒の得点（通常時比）
+              </text>
+            </g>
+          )}
           {/* 得点の棒（内側から 2P → 3P → FT） */}
           {totals.map((_, i) => {
             const a1 = i * step + gap / 2
@@ -117,12 +135,16 @@ export function ScoringClock({ data, title, subtitle }: { data: ScoringClockData
           {/* いちばん高い棒に注記 */}
           {(() => {
             const a = (peak + 0.5) * step
-            const [x, y] = polar(R0 + (totals[peak] / max) * R_MAX + 14, a)
+            const [x0, y0] = polar(R0 + (totals[peak] / max) * R_MAX + 4, a)
+            const [x, y] = polar(R0 + R_MAX + 22, a)
             const right = Math.sin(a) >= 0
             return (
-              <text x={x} y={y} className="viz-value viz-strong" textAnchor={right ? 'start' : 'end'} dominantBaseline="central">
-                {binLabel(peak, data.binSeconds)}
-              </text>
+              <g>
+                <line x1={x0} y1={y0} x2={x} y2={y} className="viz-annot-line" />
+                <text x={right ? x + 4 : x - 4} y={y} className="viz-value viz-strong" textAnchor={right ? 'start' : 'end'} dominantBaseline="central">
+                  {binLabel(peak, data.binSeconds)}
+                </text>
+              </g>
             )
           })()}
         </svg>
