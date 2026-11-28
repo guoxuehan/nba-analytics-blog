@@ -6,6 +6,8 @@
  *   PRがマージされずに溜まる、など）。
  * 最後の公開から STALE_DAYS 日以上たっていたら失敗として終了し、GitHub から通知が届くようにする。
  */
+import * as fs from 'fs'
+import * as path from 'path'
 import { createClient } from '@supabase/supabase-js'
 import { appendSummary, ghJson } from './_lib'
 
@@ -50,15 +52,31 @@ async function main() {
   console.log(lastLine)
   if (prLines.length) console.log(`オープン中のPR: ${prLines.length}件\n${prLines.join('\n')}`)
 
+  // 取材の取得元: 試合データを実際に返せているのは ESPN だけなので、ESPN が落ちたら失敗にする。
+  // ほかの取得元（NBA.com・balldontlie）の失敗は警告にとどめる（試合のない日の0件は失敗ではない）
+  const latest = path.join(process.cwd(), 'data', 'nba-latest.json')
+  const fetchErrors: string[] = fs.existsSync(latest)
+    ? ((JSON.parse(fs.readFileSync(latest, 'utf-8')) as { fetchErrors?: string[] }).fetchErrors ?? [])
+    : []
+  const espnDown = fetchErrors.some((e) => e.startsWith('site.api.espn.com'))
+  for (const e of fetchErrors) console.log(`::warning::取材の取得元が失敗: ${e}`)
+
   const stale = days >= STALE_DAYS
   appendSummary(
     [
-      `### 🩺 健康診断: ${stale ? `❌ ${STALE_DAYS}日以上公開が止まっています` : '✅ 正常'}`,
+      `### 🩺 健康診断: ${stale ? `❌ ${STALE_DAYS}日以上公開が止まっています` : espnDown ? '❌ 取材の取得元（ESPN）が落ちています' : '✅ 正常'}`,
       `- ${lastLine}`,
+      fetchErrors.length ? `- 取材の取得元の失敗: ${fetchErrors.join(' / ')}` : '- 取材の取得元: すべて応答あり',
       prLines.length ? `- オープン中のPR（確認待ちの可能性）:\n${prLines.join('\n')}` : '- オープン中のPRはありません',
     ].join('\n'),
   )
 
+  if (espnDown) {
+    throw new Error(
+      '取材の取得元 ESPN が応答しません。NBA.com（GitHub Actions からは 403）と balldontlie（APIキー）も使えない場合、' +
+        '記者は試合データなしで企画を出します。BALLDONTLIE_API_KEY の更新を検討してください。',
+    )
+  }
   if (stale) {
     throw new Error(
       `${STALE_DAYS}日以上、記事が公開されていません。` +

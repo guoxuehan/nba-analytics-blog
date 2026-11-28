@@ -243,9 +243,25 @@ async function main() {
   }
   ready.sort((a, b) => a.publishedAt.localeCompare(b.publishedAt))
 
+  /**
+   * 記事URLに流入元タグ（UTM）を付ける。GA4 で SNS ごとの流入を「直接」と分けて数えるため。
+   * 記事はURLのパスで分かるので utm_campaign は付けない（Bluesky の300文字制限に収めるため短くする）
+   */
+  const withUtm = (url: string, channel: string): string => {
+    if (!url) return url
+    const u = new URL(url)
+    u.searchParams.set('utm_source', channel.toLowerCase())
+    u.searchParams.set('utm_medium', 'social')
+    return u.toString()
+  }
+  const tagged = (text: string, article: Article, channel: string) => {
+    const url = withUtm(article.url, channel)
+    return { text: article.url ? text.split(article.url).join(url) : text, article: { ...article, url } }
+  }
+
   const summary: string[] = [`### 📣 SNS 自動投稿（${channels.map((c) => c.name).join('・') || '投稿先なし'}）`]
   for (const { issue, text, article } of ready.slice(0, remaining)) {
-    const problems = channels.map((c) => c.check(text)).filter(Boolean) as string[]
+    const problems = channels.map((c) => c.check(tagged(text, article, c.name).text)).filter(Boolean) as string[]
     if (problems.length > 0) {
       const msg = `${problems.join(' / ')}。短くしてから \`${LABELS.promo}\` を付け直してください。`
       console.warn(`⚠️  #${issue.number}: ${msg}`)
@@ -266,7 +282,8 @@ async function main() {
     const errors: string[] = []
     for (const channel of channels) {
       try {
-        results.push(`${channel.name}: ${await channel.post(text, article)}`)
+        const t = tagged(text, article, channel.name)
+        results.push(`${channel.name}: ${await channel.post(t.text, t.article)}`)
       } catch (err) {
         errors.push(`${channel.name}: ${err instanceof Error ? err.message : String(err)}`)
       }

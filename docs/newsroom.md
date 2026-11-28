@@ -11,6 +11,7 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 | 🧑‍💼 編集長 | [.claude/agents/editor-in-chief.md](../.claude/agents/editor-in-chief.md) | [scripts/newsroom/editor.ts](../scripts/newsroom/editor.ts) | 朝会 | API（Sonnet） |
 | ✍️ ライター | [.claude/agents/writer.md](../.claude/agents/writer.md) | [scripts/newsroom/writer.ts](../scripts/newsroom/writer.ts) | 企画が採用されたとき | API（Sonnet） |
 | 📈 図版デスク | [.claude/agents/graphics-desk.md](../.claude/agents/graphics-desk.md) | [scripts/newsroom/graphics-desk.ts](../scripts/newsroom/graphics-desk.ts)（ライターの直後に呼ばれる） | 入稿の前 | API（Sonnet） |
+| 🕐 図版データ | — | [scripts/viz/fetch-scoring-clock.ts](../scripts/viz/fetch-scoring-clock.ts)（[viz-scoring-clock.yml](../.github/workflows/viz-scoring-clock.yml)） | 毎日 JST 17:30 | 無料（ESPN） |
 | 🔍 校閲デスク | [.claude/agents/copy-desk.md](../.claude/agents/copy-desk.md) | claude-code-action（[newsroom-review.yml](../.github/workflows/newsroom-review.yml)） | 入稿されたとき | Claudeサブスク（Opus） |
 | ✅ デスク判定 | — | [scripts/newsroom/review-gate.ts](../scripts/newsroom/review-gate.ts) | 校閲の後 | 無料 |
 | 📣 マーケ担当 | [.claude/agents/marketer.md](../.claude/agents/marketer.md) | [scripts/newsroom/marketer.ts](../scripts/newsroom/marketer.ts) | 公開されたとき | API（Sonnet） |
@@ -33,6 +34,7 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 [執筆 newsroom-write.yml]
   ✍️ ライター: 記事と取材メモを書く
   📈 図版デスク: 主張を支えるグラフを0〜2点入れる（取材メモにない数字の図は自動で外す）
+                主題に合えば作品型の図（:::viz 名前。一覧は lib/viz.ts）を1つ入れる
   → PR で入稿                                            ラベル: 入稿 / 企画:執筆済
       content/articles/<slug>.md   記事
       content/notes/<slug>.md      取材メモ（校閲が照合に使う）
