@@ -20,6 +20,7 @@ import {
   logUsageSummary,
   recordUsage,
 } from '../auto-generate'
+import { removeInvalidCharts } from '../../lib/chart'
 import { VALID_CATEGORIES, computeScore } from '../auto-publish'
 import { parseDraft } from '../_parse-draft'
 import {
@@ -108,7 +109,10 @@ async function main() {
   )
   const parsed = parseDraft(draft)
   if (!parsed) throw new Error(`原稿の形式が崩れています。先頭: ${draft.slice(0, 200)}`)
-  const { meta, body } = parsed
+  const { meta } = parsed
+  // 形式の崩れたグラフは入稿前に外す（ページでは描画されず、校閲の手間だけ増えるため）
+  const { body, removed } = removeInvalidCharts(parsed.body)
+  for (const reason of removed) console.warn(`  ⚠️  グラフを外しました: ${reason}`)
   if (!VALID_CATEGORIES.includes(meta.category)) {
     meta.category = issue.body.match(/newsroom:category=(\w+)/)?.[1] ?? 'player_analysis'
   }
