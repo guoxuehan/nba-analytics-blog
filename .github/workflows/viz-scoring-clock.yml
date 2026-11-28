@@ -1,0 +1,51 @@
+name: "図版: 時計図のデータ（全得点の時刻）"
+
+# 今季の全試合の試合経過データから、得点が入った時刻を集計して data/viz/scoring-clock.json に保存する。
+# 起動のされ方:
+#   - 毎日（朝会の前。前夜の試合を足す）
+#   - 手動（Actions 画面から）
+#   - 集計スクリプトを変えた push（試作・改修の確認用）
+on:
+  schedule:
+    - cron: '30 8 * * *' # JST 17:30
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/viz/fetch-scoring-clock.ts'
+      - '.github/workflows/viz-scoring-clock.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: viz-scoring-clock-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: 🕐 全得点の時刻を集計
+        run: npx tsx scripts/viz/fetch-scoring-clock.ts
+
+      - name: 集計結果をコミット
+        run: |
+          if [ -n "$(git status --porcelain data/viz/)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/viz/
+            git commit -m "図版: 時計図のデータを更新"
+            git push
+          else
+            echo "変更なし"
+          fi

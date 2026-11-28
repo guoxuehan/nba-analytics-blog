@@ -641,3 +641,32 @@ body {
 .article-prose .viz-table td {
   font-variant-numeric: tabular-nums;
 }
+
+/* 時計図（ScoringClock） */
+.viz-clock .viz-plot {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.viz-clock-face {
+  fill: var(--viz-paper);
+  stroke: var(--viz-ink);
+  stroke-width: 4;
+}
+
+.viz-clock-major {
+  stroke: var(--viz-ink);
+  stroke-width: 3;
+}
+
+.viz-clock-minor {
+  stroke: var(--viz-axisline);
+  stroke-width: 1;
+}
+
+.viz-clock-q {
+  font-family: var(--font-heading);
+  font-size: 30px;
+  font-weight: 700;
+  fill: var(--viz-ink);
+}
