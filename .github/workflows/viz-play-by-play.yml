@@ -1,6 +1,6 @@
-name: "図版: 時計図のデータ（全得点の時刻）"
+name: "図版: 作品型の図のデータ（試合経過の集計）"
 
-# 今季の全試合の試合経過データ（ESPN）から、得点が入った時刻を集計して data/viz/scoring-clock.json に保存する。
+# 今季の全試合の試合経過データ（ESPN）を集計し、作品型の図のデータを data/viz/ に保存する（scoring-clock.json / decided-at.json）。
 # 起動のされ方:
 #   - 毎日（朝会の前。前夜の試合を足す）
 #   - 手動（Actions 画面から）
@@ -11,15 +11,15 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'scripts/viz/fetch-scoring-clock.ts'
-      - '.github/workflows/viz-scoring-clock.yml'
+      - 'scripts/viz/fetch-play-by-play.ts'
+      - '.github/workflows/viz-play-by-play.yml'
       - '.gitignore' # data/viz/ をコミットできるかどうかを左右する
 
 permissions:
   contents: write
 
 concurrency:
-  group: viz-scoring-clock-${{ github.ref }}
+  group: viz-play-by-play-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -36,8 +36,8 @@ jobs:
 
       - run: npm ci
 
-      - name: 🕐 全得点の時刻を集計
-        run: npx tsx scripts/viz/fetch-scoring-clock.ts
+      - name: 🕐 試合経過を集計（時計図・試合はいつ決まるか）
+        run: npx tsx scripts/viz/fetch-play-by-play.ts
 
       - name: 集計結果をコミット
         run: |

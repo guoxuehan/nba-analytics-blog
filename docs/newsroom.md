@@ -11,7 +11,7 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 | 🧑‍💼 編集長 | [.claude/agents/editor-in-chief.md](../.claude/agents/editor-in-chief.md) | [scripts/newsroom/editor.ts](../scripts/newsroom/editor.ts) | 朝会 | API（Sonnet） |
 | ✍️ ライター | [.claude/agents/writer.md](../.claude/agents/writer.md) | [scripts/newsroom/writer.ts](../scripts/newsroom/writer.ts) | 企画が採用されたとき | API（Sonnet） |
 | 📈 図版デスク | [.claude/agents/graphics-desk.md](../.claude/agents/graphics-desk.md) | [scripts/newsroom/graphics-desk.ts](../scripts/newsroom/graphics-desk.ts)（ライターの直後に呼ばれる） | 入稿の前 | API（Sonnet） |
-| 🕐 図版データ | — | [scripts/viz/fetch-scoring-clock.ts](../scripts/viz/fetch-scoring-clock.ts)（[viz-scoring-clock.yml](../.github/workflows/viz-scoring-clock.yml)） | 毎日 JST 17:30 | 無料（ESPN） |
+| 🕐 図版データ | — | [scripts/viz/fetch-play-by-play.ts](../scripts/viz/fetch-play-by-play.ts)（[viz-play-by-play.yml](../.github/workflows/viz-play-by-play.yml)） | 毎日 JST 17:30 | 無料（ESPN） |
 | 🔍 校閲デスク | [.claude/agents/copy-desk.md](../.claude/agents/copy-desk.md) | claude-code-action（[newsroom-review.yml](../.github/workflows/newsroom-review.yml)） | 入稿されたとき | Claudeサブスク（Opus） |
 | ✅ デスク判定 | — | [scripts/newsroom/review-gate.ts](../scripts/newsroom/review-gate.ts) | 校閲の後 | 無料 |
 | 📣 マーケ担当 | [.claude/agents/marketer.md](../.claude/agents/marketer.md) | [scripts/newsroom/marketer.ts](../scripts/newsroom/marketer.ts) | 公開されたとき | API（Sonnet） |
@@ -68,7 +68,7 @@ NBA COURT VISION の記事は、AIエージェントの「編集部」がGitHub�
 | 公開を止める | 記事PRに `保留` ラベルを付ける |
 | 記事を直させる | 記事PRで `@claude 〇〇を直して` とコメント |
 | 確認待ちの記事を公開する | PR をマージする（マージで公開ワークフローが動く） |
-| 校閲をやり直す | Actions →「編集部: 校閲デスク」→ Run workflow に PR 番号を入れる |
+| 校閲をやり直す / 人間が書いた記事PRを校閲に回す | Actions →「編集部: 校閲デスク」→ Run workflow に PR 番号を入れる（PRを作っただけでは校閲は動かない） |
 | 朝会を今すぐ開く | Actions →「編集部: 朝会」→ Run workflow |
 | SNS に投稿する文面を選ぶ | 配信 Issue の本文で、投稿したいパターンを一番上にする（書き換えも可） |
 | SNS に投稿させない | 配信 Issue から `マーケ:配信待ち` ラベルを外す |

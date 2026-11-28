@@ -2,18 +2,17 @@ name: "編集部: 校閲デスク（ファクトチェック・校正 → デス
 
 # 起動のされ方:
 #   - ライター（newsroom-write.yml）が入稿したとき（workflow_dispatch）
-#   - 人間が記事PRを作ったとき（下書きPRは対象外）
-#   - Actions 画面から PR 番号を指定して手動で再校閲するとき
+#   - Actions 画面から PR 番号を指定して手動で校閲するとき（人間が書いた記事PRもこちら）
+#
+# pull_request では起動しない。ライター（ボット）のPRで pull_request の実行が作られると、
+# ジョブが1つも始まらないまま待たされ、校閲の修正コミットがPRに積まれた時点で
+# 「failure」として記録されていた（11/23以降すべての記事PRで発生）。
 on:
   workflow_dispatch:
     inputs:
       pr:
         description: '記事PRの番号'
         required: true
-  pull_request:
-    types: [opened, reopened, ready_for_review]
-    paths:
-      - 'content/articles/**'
 
 permissions:
   contents: write
@@ -24,23 +23,13 @@ permissions:
 
 jobs:
   review:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
-       !github.event.pull_request.draft &&
-       github.event.pull_request.user.type != 'Bot')
-    # ↑ ライターが作ったPR（ボット）は、ライターが workflow_dispatch で校閲を起動するので
-    #   pull_request イベントでは動かさない（二重校閲の防止）
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # ボットPRの pull_request 実行は上の if でスキップされるが、同じ PR 番号の
-    # グループに入るとライターが起動した校閲（workflow_dispatch）の終了まで待たされ、
-    # ジョブ0件の「failure」として残っていた。スキップされる実行は専用グループに逃がす。
     concurrency:
-      group: ${{ github.event.pull_request.user.type == 'Bot' && format('newsroom-review-skip-{0}', github.run_id) || format('newsroom-review-{0}', inputs.pr || github.event.pull_request.number) }}
+      group: newsroom-review-${{ inputs.pr }}
       cancel-in-progress: true
     env:
-      PR: ${{ inputs.pr || github.event.pull_request.number }}
+      PR: ${{ inputs.pr }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       QUALITY_THRESHOLD: ${{ vars.QUALITY_THRESHOLD || '70' }}
     steps:

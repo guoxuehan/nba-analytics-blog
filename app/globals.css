@@ -678,3 +678,10 @@ body {
 .viz-clock .viz-tip-name {
   white-space: nowrap;
 }
+
+/* 試合はいつ決まるか（DecidedAt） */
+.viz-key-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
