@@ -47,7 +47,9 @@ next-env.d.ts
 /thumbnails/
 
 # 自動パイプライン生成ファイル
-/data/
+/data/*
+# 図版のデータは記事ページの描画に使うのでコミットする（他の取材データは毎日作り直す）
+!/data/viz/
 /logs/
 /articles-draft/needs-review/
 /articles-draft/x-posts/
