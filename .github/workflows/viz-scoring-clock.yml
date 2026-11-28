@@ -13,6 +13,7 @@ on:
     paths:
       - 'scripts/viz/fetch-scoring-clock.ts'
       - '.github/workflows/viz-scoring-clock.yml'
+      - '.gitignore' # data/viz/ をコミットできるかどうかを左右する
 
 permissions:
   contents: write
