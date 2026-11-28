@@ -33,8 +33,11 @@ jobs:
     #   pull_request イベントでは動かさない（二重校閲の防止）
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # ボットPRの pull_request 実行は上の if でスキップされるが、同じ PR 番号の
+    # グループに入るとライターが起動した校閲（workflow_dispatch）の終了まで待たされ、
+    # ジョブ0件の「failure」として残っていた。スキップされる実行は専用グループに逃がす。
     concurrency:
-      group: newsroom-review-${{ inputs.pr || github.event.pull_request.number }}
+      group: ${{ github.event.pull_request.user.type == 'Bot' && format('newsroom-review-skip-{0}', github.run_id) || format('newsroom-review-{0}', inputs.pr || github.event.pull_request.number) }}
       cancel-in-progress: true
     env:
       PR: ${{ inputs.pr || github.event.pull_request.number }}

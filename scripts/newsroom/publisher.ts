@@ -10,7 +10,7 @@ import * as path from 'path'
 import { createClient } from '@supabase/supabase-js'
 import { logUsageSummary } from '../auto-generate'
 import { VALID_CATEGORIES } from '../auto-publish'
-import { ARTICLES_DIR, ArticleFile, appendSummary, readArticle } from './_lib'
+import { ARTICLES_DIR, ArticleFile, appendSummary, gh, readArticle } from './_lib'
 import { promote } from './marketer'
 
 type Row = {
@@ -124,6 +124,20 @@ async function main() {
       await promote(article, publishedAt)
     } catch (err) {
       console.warn(`⚠️  ${article.meta.slug}: 配信案の作成に失敗 — ${err instanceof Error ? err.message : err}`)
+    }
+  }
+
+  // 企画Issueを閉じる。デスク判定の自動マージは GITHUB_TOKEN で行うため、
+  // PR本文の「Closes #N」が効かず、企画Issueが開いたまま残っていた（失敗しても公開は取り消さない）
+  for (const { article, publishedAt } of inserted) {
+    const issue = article.meta.issue
+    if (!issue) continue
+    try {
+      if (gh(['issue', 'view', String(issue), '--json', 'state', '-q', '.state']) !== 'OPEN') continue
+      gh(['issue', 'close', String(issue), '--reason', 'completed', '--comment', `🚀 **公開: 記事を掲載しました**（公開日時 ${publishedAt}）`])
+      console.log(`✅ 企画 #${issue} をクローズ`)
+    } catch (err) {
+      console.warn(`⚠️  企画 #${issue} のクローズに失敗 — ${err instanceof Error ? err.message : err}`)
     }
   }
 
