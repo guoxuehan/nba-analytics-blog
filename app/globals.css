@@ -51,9 +51,10 @@
   --color-badge-bg:       var(--badge-bg);
   --color-badge-text:     var(--badge-text);
 
-  /* Fonts — next/font/local（app/fonts/ の同梱フォント）が --font-oswald / --font-source-sans を注入 */
-  --font-heading: var(--font-oswald), 'Noto Sans JP', sans-serif;
-  --font-body:    var(--font-source-sans), 'Noto Sans JP', sans-serif;
+  /* Fonts — 見出し・本文・図はすべて LINE Seed JP。Oswald（ブランド）はロゴだけに使う（--font-logo） */
+  --font-logo:    var(--font-oswald), 'LINE Seed JP', sans-serif;
+  --font-heading: 'LINE Seed JP', var(--font-oswald), sans-serif;
+  --font-body:    'LINE Seed JP', var(--font-source-sans), sans-serif;
 }
 
 /* ─────────────────────────────────────────────
@@ -176,11 +177,11 @@ body {
 }
 
 .article-prose h2 {
-  font-family: var(--font-heading);
+  font-family: var(--font-body);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: 1.2;
   margin-top: 2.5rem;
   margin-bottom: 1rem;
@@ -699,4 +700,19 @@ body {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+}
+
+/* 時計図・決着図は SVG ごと縮むので、スマホ幅では図の中の文字を大きくして読める大きさを保つ */
+@media (max-width: 520px) {
+  .viz-clock .viz-value,
+  .viz-decided .viz-value,
+  .viz-decided .viz-tick {
+    font-size: 22px;
+  }
+  .viz-clock-q {
+    font-size: 26px;
+  }
+  .viz-clock-hero-label {
+    font-size: 22px;
+  }
 }

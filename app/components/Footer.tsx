@@ -41,7 +41,7 @@ export function Footer() {
           <div className="shrink-0">
             <p
               className="font-heading font-bold text-lg uppercase text-text-primary"
-              style={{ letterSpacing: '0.1em' }}
+              style={{ fontFamily: 'var(--font-logo)', letterSpacing: '0.1em' }}
             >
               NBA COURT VISION
             </p>
